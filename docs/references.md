@@ -193,7 +193,7 @@ Each assumption names how it will be tested and the milestone that tests it. Whe
 | A8 | ~~`network-observe` and `mount-observe` cover `network_state`, `listening_sockets` and `disk_usage`.~~ Refuted 2026-10-26 for the first two (F28, F31); `disk_usage` works through `hostfs` (F34). | | M0 |
 | A9 | The inference snaps used in the benchmark support tool calling through their OpenAI-compatible endpoint. | Send a tool-call request to each snap and engine; record which work. | M2 |
 | A10 | Snaps with strict confinement work inside LXD containers on an Ubuntu host, and each fault class can be reproduced in a container or needs a VM. | Install the spike snap in a container and a VM; reproduce each scenario's fault. | M2 |
-| A11 | The snap name `maat` is available to register (no published snap was found on 2026-10-25). | `snapcraft register maat`. | M0 |
+| A11 | ~~The snap name `maat` is available to register.~~ Confirmed 2026-10-26: registered, and v0.1.0 published on `edge`. | | M0 |
 | A12 | AppArmor denials caused by the snap appear in the journal with `apparmor="DENIED"`, readable through `log-observe`. | Trigger a denial from the spike snap and query for it. | M0 |
 | A13 | Landlock can be applied by the server to itself inside the snap's seccomp profile, as an extra layer that blocks writes `log-observe` would allow. | Call the Landlock syscalls from the snap and check for seccomp denials. | Later |
 | A14 | The LXD Go client's license is compatible with a GPL-3.0 harness; otherwise the harness drives the `lxc` command instead. | Check the license headers of the packages the harness would import. | M2 |

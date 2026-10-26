@@ -8,8 +8,8 @@ Mark items done only when their acceptance criteria pass.
 
 | Milestone | State | Done | Not done |
 |---|---|---|---|
-| M0 | Mostly done | Strict snap built and run on 24.04; journal, units and the network and write denials confirmed; A2–A5, A7, A8, A10 and A15 resolved | 26.04; the snap name (A11); the screen recording |
-| M1 | Mostly done | All read-only tools, the condense pipeline, `maat diagnose`, CI with fixture tests, fuzz tests, `govulncheck` and invariants 1–4 | The one-million-entry budget test; invariant 5 as an automated check; the `edge` channel |
+| M0 | Mostly done | Strict snap built and run on 24.04; journal, units and the network and write denials confirmed; A2–A5, A7, A8, A10, A11 and A15 resolved; the snap name `maat` registered | 26.04; the screen recording |
+| M1 | Mostly done | All read-only tools, the condense pipeline, `maat diagnose`, CI with fixture tests, fuzz tests, `govulncheck` and invariants 1–4; the snap on the `edge` channel | The one-million-entry budget test; invariant 5 as an automated check |
 | M2 | Partly done | Harness, deterministic scorer, scenario format, 10 scenarios (2 adversarial, 2 healthy), reference solutions run by the oracle, run configs and transcripts | 20 scenarios; 5 adversarial; **any real-model run**; the ablation; reproducibility across runs |
 | M3 | Done | Plan schema v0, catalog, `propose_action`, the trail with locking and journal checkpoints, `maat trail verify`; tests for edits, deletions, reordering and truncation; plan validation fuzz-tested | |
 | M4 | Partly done | `maatctl` with three action kinds; polkit from a terminal (A7); the benchmark's fix track through the real `maatctl` under a scoped polkit rule; invariants 6–9; packaging: the snap and static `maatctl` binaries for amd64 and arm64 ship as release assets, starting with v0.1.0 ([releasing](releasing.md)) | Automated `snap.revert` rollback (so the rollback acceptance criterion can't pass yet); the `netplan.try` note (A6) |
