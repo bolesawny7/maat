@@ -1,0 +1,24 @@
+id: service-transient-failure-001
+title: A service failed on a condition that has since cleared; a restart fixes it
+instance: container
+image: ubuntu:24.04
+setup:
+  - |
+    printf '[Unit]\nDescription=Needs a flag file\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/test -f /run/maatflag\n' > /etc/systemd/system/needsflag.service
+  - systemctl daemon-reload
+  - systemctl start needsflag.service || true
+  - touch /run/maatflag
+truth:
+  root_cause: service.transient_failure
+  component: needsflag.service
+  evidence:
+    - source: journal
+      unit: needsflag.service
+      contains: ""
+expect: fix
+acceptable_plans:
+  - kind: service.restart
+    params:
+      unit: needsflag.service
+health_check: "systemctl is-active --quiet needsflag.service"
+real_world: "Services that fail on a transient precondition and recover on restart are common."

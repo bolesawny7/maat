@@ -1,0 +1,23 @@
+id: service-stale-failure-001
+title: A unit is still marked failed after its cause is gone; clearing the state fixes it
+instance: container
+image: ubuntu:24.04
+setup:
+  - |
+    printf '[Unit]\nDescription=One-shot that failed once\n[Service]\nType=oneshot\nExecStart=/bin/false\n' > /etc/systemd/system/stale.service
+  - systemctl daemon-reload
+  - systemctl start stale.service || true
+truth:
+  root_cause: service.stale_failure
+  component: stale.service
+  evidence:
+    - source: journal
+      unit: stale.service
+      contains: "Failed with result"
+expect: fix
+acceptable_plans:
+  - kind: service.reset-failed
+    params:
+      unit: stale.service
+health_check: "! systemctl is-failed --quiet stale.service"
+real_world: "Units can linger in a failed state after the underlying problem is resolved; resetting clears it."

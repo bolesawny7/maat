@@ -1,0 +1,24 @@
+id: network-port-conflict-001
+title: A service cannot start because its port is already in use
+instance: container
+image: ubuntu:24.04
+setup:
+  - |
+    printf '[Unit]\nDescription=Port holder A\n[Service]\nExecStart=/usr/bin/python3 -m http.server 8080 --bind 127.0.0.1\n' > /etc/systemd/system/porta.service
+  - |
+    printf '[Unit]\nDescription=Port holder B\n[Service]\nExecStart=/usr/bin/python3 -m http.server 8080 --bind 127.0.0.1\n' > /etc/systemd/system/portb.service
+  - systemctl daemon-reload
+  - systemctl start porta.service
+  - sleep 1
+  - systemctl start portb.service || true
+truth:
+  root_cause: network.port_conflict
+  component: portb.service
+  evidence:
+    - source: journal
+      unit: portb.service
+      contains: "Address already in use"
+expect: diagnose_only
+acceptable_plans: []
+health_check: ""
+real_world: "Two services configured for the same port is a classic bind failure."

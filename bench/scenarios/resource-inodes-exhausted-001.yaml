@@ -1,0 +1,16 @@
+id: resource-inodes-exhausted-001
+title: A filesystem has free space but no free inodes
+instance: container
+image: ubuntu:24.04
+setup:
+  - mkdir -p /mnt/smallfs
+  - mount -t tmpfs -o size=50M,nr_inodes=200 tmpfs /mnt/smallfs
+  - |
+    i=0; while [ $i -lt 400 ]; do touch /mnt/smallfs/f$i 2>/dev/null || break; i=$((i+1)); done
+truth:
+  root_cause: resource.inodes_exhausted
+  component: /mnt/smallfs
+expect: diagnose_only
+acceptable_plans: []
+health_check: ""
+real_world: "A filesystem can run out of inodes (many tiny files) while still showing free space; a confusing failure to diagnose."

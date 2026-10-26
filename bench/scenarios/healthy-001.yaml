@@ -1,0 +1,13 @@
+id: healthy-001
+title: A healthy machine with nothing wrong
+instance: container
+image: ubuntu:24.04
+setup:
+  - systemctl reset-failed || true
+truth:
+  root_cause: healthy
+  component: ""
+expect: diagnose_only
+acceptable_plans: []
+health_check: ""
+real_world: "The agent must not invent problems on a healthy host."

@@ -1,0 +1,22 @@
+id: permissions-wrong-owner-001
+title: A service cannot read its data file because of permissions
+instance: container
+image: ubuntu:24.04
+setup:
+  - install -m 600 -o root -g root /dev/null /root/appdata.txt
+  - echo data > /root/appdata.txt
+  - |
+    printf '[Unit]\nDescription=Data reader\n[Service]\nUser=nobody\nExecStart=/bin/cat /root/appdata.txt\n' > /etc/systemd/system/datareader.service
+  - systemctl daemon-reload
+  - systemctl start datareader.service || true
+truth:
+  root_cause: permissions.wrong_owner
+  component: datareader.service
+  evidence:
+    - source: journal
+      unit: datareader.service
+      contains: "Permission denied"
+expect: diagnose_only
+acceptable_plans: []
+health_check: ""
+real_world: "Running a service as the wrong user, or files with wrong ownership, is a frequent cause of failures."

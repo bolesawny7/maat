@@ -1,0 +1,51 @@
+name: maat
+base: core24
+adopt-info: maat
+summary: Confined, auditable system diagnostics for AI agents
+description: |
+  maat exposes read-only Ubuntu diagnostics (journal, systemd units, processes,
+  filesystems, networking, AppArmor denials) to AI agents over the Model Context
+  Protocol, with the limits enforced by snap confinement rather than by the
+  model's good behaviour. It records typed, reviewable plans that a human applies
+  with the separate, unconfined maatctl tool after authorizing them through
+  polkit.
+
+  This is a development preview. The server is strictly confined and plugs only
+  read-oriented interfaces; it has no network access.
+
+grade: devel
+confinement: strict
+
+apps:
+  maat:
+    command: bin/maat
+    # Read-oriented interfaces only, and deliberately NOT network-observe:
+    # testing showed network-observe permits outbound AF_INET connections, which
+    # would give a hijacked model an exfiltration channel. Dropping it keeps the
+    # no-egress guarantee; the network collector fails closed under this profile.
+    # There is likewise no `network` plug. All three are manual-connect.
+    plugs:
+      - log-observe
+      - system-observe
+      - mount-observe
+
+parts:
+  maat:
+    plugin: go
+    source: .
+    build-snaps:
+      - go/stable
+    override-pull: |
+      craftctl default
+      craftctl set version="0.0.1-dev+$(git -C "$CRAFT_PART_SRC" rev-parse --short HEAD 2>/dev/null || echo local)"
+    build-environment:
+      - CGO_ENABLED: "0"
+    # `ip` is used by the network collector; the base image does not ship it.
+    stage-packages:
+      - iproute2
+    # Ship only the confined server. maatctl is unconfined and distributed
+    # separately; the benchmark harness is a developer tool. Neither belongs in
+    # the snap.
+    prime:
+      - -bin/maatctl
+      - -bin/harness

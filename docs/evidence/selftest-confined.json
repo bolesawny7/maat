@@ -1,0 +1,50 @@
+{
+  "confined": true,
+  "snap_name": "maat",
+  "checks": [
+    {
+      "name": "journal_readable",
+      "expectation": "maat can read the system journal",
+      "observed": "read 1 entry/entries from the journal",
+      "pass": true
+    },
+    {
+      "name": "units_listable",
+      "expectation": "maat can list systemd units over D-Bus",
+      "observed": "listed 559 units",
+      "pass": true
+    },
+    {
+      "name": "network_blocked",
+      "expectation": "the confined server cannot open an outbound network connection",
+      "observed": "outbound TCP connect was refused: dial tcp 1.1.1.1:443: socket: permission denied",
+      "pass": true
+    },
+    {
+      "name": "filesystem_read_only",
+      "expectation": "the confined server cannot write to the host filesystem",
+      "observed": "write to /etc was refused: open /etc/maat-selftest-probe: permission denied",
+      "pass": true
+    },
+    {
+      "name": "systemd_control_denied",
+      "expectation": "the confined server cannot restart systemd units",
+      "observed": "RestartUnit was refused: An AppArmor policy prevents this sender from sending this message to this recipient; type=\"method_call\", sender=\":1.123\" (uid=502 pid=219968 comm=\"/snap/maat/x4/bin/maat selftest --json\" label=\"snap.maat.maat (enforce)\") interface=\"org.freedesktop.systemd1.Manager\" member=\"RestartUnit\" error name=\"(unset)\" requested_reply=\"0\" destination=\"org.freedesktop.systemd1\" (uid=0 pid=1 comm=\"/sbin/init\" label=\"unconfined\")",
+      "pass": true
+    },
+    {
+      "name": "network_state_readable",
+      "expectation": "informational: can the network collector read links/routes?",
+      "observed": "no (fails closed): exit status 1",
+      "pass": true
+    },
+    {
+      "name": "sockets_readable",
+      "expectation": "informational: can listening sockets be read from /proc/net?",
+      "observed": "yes: 0 sockets",
+      "pass": true
+    }
+  ],
+  "passed": 7,
+  "failed": 0
+}

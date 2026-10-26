@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test, vet, invariants
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          check-latest: true
+      - name: gofmt
+        run: |
+          out=$(gofmt -l cmd internal bench/harness)
+          if [ -n "$out" ]; then echo "gofmt needed on:"; echo "$out"; exit 1; fi
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test ./...
+      - name: go test -race
+        run: go test -race ./internal/trail/... ./internal/condense/...
+      - name: security invariants
+        run: go test ./internal/invariants/...
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)"/bin/govulncheck ./...
+
+  snap:
+    name: build strict snap
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build snap
+        uses: snapcore/action-build@v1
+      - name: Upload snap
+        uses: actions/upload-artifact@v4
+        with:
+          name: maat-snap
+          path: "*.snap"
+          if-no-files-found: error

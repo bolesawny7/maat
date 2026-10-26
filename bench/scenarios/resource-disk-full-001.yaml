@@ -1,0 +1,15 @@
+id: resource-disk-full-001
+title: A filesystem has run out of space
+instance: container
+image: ubuntu:24.04
+setup:
+  - mkdir -p /mnt/appdata
+  - mount -t tmpfs -o size=8M tmpfs /mnt/appdata
+  - dd if=/dev/zero of=/mnt/appdata/blob bs=1M count=16 2>/dev/null || true
+truth:
+  root_cause: resource.disk_full
+  component: /mnt/appdata
+expect: diagnose_only
+acceptable_plans: []
+health_check: ""
+real_world: "Common operational failure; e.g. https://askubuntu.com/questions/tagged/disk-full"

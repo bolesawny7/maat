@@ -1,0 +1,21 @@
+# Build output
+/bin/
+*.snap
+# stray top-level build artifacts (go build without -o drops binaries in cwd)
+/maat
+/maatctl
+/harness
+
+# snapcraft / craft build dirs
+/parts/
+/stage/
+/prime/
+/overlay/
+/snap/.snapcraft/
+
+# Personal launch kit (marketing copy, graphics) — not part of the project
+/launch/
+
+# Go
+*.test
+*.out

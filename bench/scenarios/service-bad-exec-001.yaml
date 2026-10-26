@@ -1,0 +1,20 @@
+id: service-bad-exec-001
+title: A service fails because its executable does not exist
+instance: container
+image: ubuntu:24.04
+setup:
+  - |
+    printf '[Unit]\nDescription=Broken demo service\n[Service]\nExecStart=/usr/local/bin/definitely-not-here --serve\n' > /etc/systemd/system/brokendemo.service
+  - systemctl daemon-reload
+  - systemctl start brokendemo.service || true
+truth:
+  root_cause: service.bad_exec
+  component: brokendemo.service
+  evidence:
+    - source: journal
+      unit: brokendemo.service
+      contains: "203/EXEC"
+expect: diagnose_only
+acceptable_plans: []
+health_check: ""
+real_world: "Typos and bad paths in unit ExecStart are a frequent cause of failed services."
