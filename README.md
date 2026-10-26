@@ -152,12 +152,10 @@ The oracle proves every scenario is solvable, leaves the evidence it needs, and 
 
 ## Quickstart
 
-maat runs on Ubuntu 24.04 or later. Install the snap from the [latest release](https://github.com/bolesawny7/maat/releases/latest) and connect its three interfaces:
+maat runs on Ubuntu 24.04 or later. Install the snap from the [Snap Store](https://snapcraft.io/maat) edge channel and connect its three interfaces:
 
 ```bash
-arch=$(dpkg --print-architecture)   # amd64 or arm64
-curl -fLO "https://github.com/bolesawny7/maat/releases/latest/download/maat_$arch.snap"
-sudo snap install --dangerous "./maat_$arch.snap"   # --dangerous: the file isn't signed by the Snap Store
+sudo snap install maat --edge
 for iface in log-observe system-observe mount-observe; do
   sudo snap connect "maat:$iface"
 done
@@ -168,7 +166,7 @@ maat selftest   # prove the confinement holds on your machine
 maat diagnose   # deterministic report, no AI involved
 ```
 
-The release's `SHA256SUMS` lists the checksums. To build the snap yourself, run `snapcraft pack` in a checkout; [docs/demo.md](docs/demo.md) has the full walk-through.
+The release's `SHA256SUMS` lists the checksums for the GitHub release artifacts. To build the snap yourself, run `snapcraft pack` in a checkout; [docs/demo.md](docs/demo.md) has the full walk-through.
 
 `maatctl` lives outside the snap by design. Download it from the same release, or build it with Go 1.26 or later:
 
