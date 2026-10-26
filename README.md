@@ -156,7 +156,7 @@ maat runs on Ubuntu 24.04 or later. Install the snap from the [latest release](h
 
 ```bash
 arch=$(dpkg --print-architecture)   # amd64 or arm64
-curl -LO "https://github.com/bolesawny7/maat/releases/latest/download/maat_$arch.snap"
+curl -fLO "https://github.com/bolesawny7/maat/releases/latest/download/maat_$arch.snap"
 sudo snap install --dangerous "./maat_$arch.snap"   # --dangerous: the file isn't signed by the Snap Store
 for iface in log-observe system-observe mount-observe; do
   sudo snap connect "maat:$iface"
@@ -173,7 +173,7 @@ The release's `SHA256SUMS` lists the checksums. To build the snap yourself, run 
 `maatctl` lives outside the snap by design. Download it from the same release, or build it with Go 1.26 or later:
 
 ```bash
-curl --create-dirs -Lo ~/.local/bin/maatctl "https://github.com/bolesawny7/maat/releases/latest/download/maatctl_linux_$arch"
+curl -f --create-dirs -Lo ~/.local/bin/maatctl "https://github.com/bolesawny7/maat/releases/latest/download/maatctl_linux_$arch"
 chmod +x ~/.local/bin/maatctl
 # or: go install github.com/bolesawny7/maat/cmd/maatctl@latest   (installs to $(go env GOPATH)/bin)
 ```

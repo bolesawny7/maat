@@ -12,7 +12,7 @@ Mark items done only when their acceptance criteria pass.
 | M1 | Mostly done | All read-only tools, the condense pipeline, `maat diagnose`, CI with fixture tests, fuzz tests, `govulncheck` and invariants 1–4 | The one-million-entry budget test; invariant 5 as an automated check; the `edge` channel |
 | M2 | Partly done | Harness, deterministic scorer, scenario format, 10 scenarios (2 adversarial, 2 healthy), reference solutions run by the oracle, run configs and transcripts | 20 scenarios; 5 adversarial; **any real-model run**; the ablation; reproducibility across runs |
 | M3 | Done | Plan schema v0, catalog, `propose_action`, the trail with locking and journal checkpoints, `maat trail verify`; tests for edits, deletions, reordering and truncation; plan validation fuzz-tested | |
-| M4 | Partly done | `maatctl` with three action kinds; polkit from a terminal (A7); the benchmark's fix track through the real `maatctl` under a scoped polkit rule; invariants 6–9 | Automated `snap.revert` rollback (so the rollback acceptance criterion can't pass yet); a packaging decision; the `netplan.try` note (A6) |
+| M4 | Partly done | `maatctl` with three action kinds; polkit from a terminal (A7); the benchmark's fix track through the real `maatctl` under a scoped polkit rule; invariants 6–9; packaging: the snap and static `maatctl` binaries for amd64 and arm64 ship as release assets, starting with v0.1.0 ([releasing](releasing.md)) | Automated `snap.revert` rollback (so the rollback acceptance criterion can't pass yet); the `netplan.try` note (A6) |
 | M5 | Not started | | |
 
 The single most important next step is M2's real-model runs, preceded by harder scenarios: a keyword baseline already scores 9 of 10 on the current set.
