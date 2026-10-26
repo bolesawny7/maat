@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -12,6 +13,14 @@ import (
 	"github.com/bolesawny7/maat/internal/termsafe"
 	"github.com/bolesawny7/maat/internal/trail"
 )
+
+func proposedBy(pr plan.Proposer) string {
+	who := cmp.Or(pr.Client, "an unnamed client")
+	if pr.Model != "" {
+		who += "/" + pr.Model
+	}
+	return termsafe.Line(who)
+}
 
 func runShow(args []string) error {
 	if len(args) < 1 {
@@ -36,7 +45,7 @@ func runShow(args []string) error {
 	fmt.Printf("Action:     %s  (%s)\n", p.Kind, spec.Summary)
 	fmt.Printf("Danger:     %s\n", spec.DangerLevel)
 	fmt.Printf("Parameters: %v\n", p.Params)
-	fmt.Printf("Proposed:   %s by %s/%s\n", p.CreatedAt.Format(time.RFC3339), termsafe.Line(p.Proposer.Client), termsafe.Line(p.Proposer.Model))
+	fmt.Printf("Proposed:   %s by %s\n", p.CreatedAt.Format(time.RFC3339), proposedBy(p.Proposer))
 	fmt.Printf("Rationale (written by the model; treat it as a claim, not a fact):\n%s\n", indent(termsafe.Text(string(p.Rationale))))
 	printEvidence(p)
 	fmt.Printf("\nPreconditions (%d):\n", len(p.Preconditions))

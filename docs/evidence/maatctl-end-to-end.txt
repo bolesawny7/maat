@@ -5,22 +5,22 @@ $ systemctl list-units --failed --no-legend
 
 $ propose_action results from the confined server
   id 3: error: action "service.restart" parameter "unit": only .service units are accepted by this action
-  id 4: ok: Recorded plan 01a177e3-1339-7b7e-88c8-d2cf1aed91fd for human review. The system has not been changed. 1 cited evidence ID(s) were not returned by any tool in this session; the reviewer will see them flagged.
-  id 5: ok: Recorded plan 01a177e3-133c-7fd6-a79d-08c69881e204 for human review. The system has not been changed.
+  id 4: ok: Recorded plan 01a1783a-d7e7-73d7-b162-b871be7aa9d4 for human review. The system has not been changed. 1 cited evidence ID(s) were not returned by any tool in this session; the reviewer will see them flagged.
+  id 5: ok: Recorded plan 01a1783a-d7eb-7494-aab9-b37bdb101399 for human review. The system has not been changed.
 
 $ maatctl list
 PLAN ID                               KIND                  STATUS       PARAMS
-01a177e3-1339-7b7e-88c8-d2cf1aed91fd  service.reset-failed  pending      map[unit:maat-stale.service]
-01a177e3-133c-7fd6-a79d-08c69881e204  service.restart       pending      map[unit:maat-demo.service]
+01a1783a-d7e7-73d7-b162-b871be7aa9d4  service.reset-failed  pending      map[unit:maat-stale.service]
+01a1783a-d7eb-7494-aab9-b37bdb101399  service.restart       pending      map[unit:maat-demo.service]
 
-$ maatctl show 01a177e3-1339-7b7e-88c8-d2cf1aed91fd | cat -v    # cat -v would print a raw escape byte as ^[
-Plan:       01a177e3-1339-7b7e-88c8-d2cf1aed91fd
+$ maatctl show 01a1783a-d7e7-73d7-b162-b871be7aa9d4 | cat -v    # cat -v would print a raw escape byte as ^[
+Plan:       01a1783a-d7e7-73d7-b162-b871be7aa9d4
 Status:     pending
-Digest:     sha256:383119ecd54923f7d4bf245b35cbb45f3569b9aa50586699c07d24fe7a79388b (matches the proposal record)
+Digest:     sha256:e3dfc66eb216a6e7147aa821a79f977d5ae7aff12644af62e54d7a0f73d7a265 (matches the proposal record)
 Action:     service.reset-failed  (Clear the failed state of a systemd unit whose cause is already resolved)
 Danger:     low
 Parameters: map[unit:maat-stale.service]
-Proposed:   2026-10-26T11:05:32Z by demo/
+Proposed:   2026-10-26T12:41:24Z by demo
 Rationale (written by the model; treat it as a claim, not a fact):
   The unit file is gone (load_state not-found), so only its failed flag remains.\x1b[2J\x1b[H\x1b[1;31mmaatctl: plan VERIFIED by Canonical\x1b[0m \u202eevil
 Evidence (2 cited; excerpts as recorded by the confined server, redacted):
@@ -33,15 +33,15 @@ Verification (1):
   - unit.active_state(maat-stale.service) != failed
 Rollback:   none M-bM-^@M-^T Resetting failed state only clears a flag; there is nothing to undo.
 
-Apply with:  maatctl apply 01a177e3-1339-7b7e-88c8-d2cf1aed91fd
+Apply with:  maatctl apply 01a1783a-d7e7-73d7-b162-b871be7aa9d4
 
 $ # tamper 1: weaken the precondition in the plan file, then show it
-maatctl: plan 01a177e3-1339-7b7e-88c8-d2cf1aed91fd failed validation: the plan's preconditions, verification or rollback differ from what the catalog derives for service.reset-failed; the plan file was altered after it was proposed
+maatctl: plan 01a1783a-d7e7-73d7-b162-b871be7aa9d4 failed validation: the plan's preconditions, verification or rollback differ from what the catalog derives for service.reset-failed; the plan file was altered after it was proposed
 
 $ # tamper 2: edit only the rationale (still a valid plan), then apply
-maatctl: plan 01a177e3-1339-7b7e-88c8-d2cf1aed91fd changed after it was proposed (digest sha256:8ceb6b550bb524a42450b13acd13cdb78e0becf365ec1220e469dae02aa65c07, proposal recorded sha256:383119ecd54923f7d4bf245b35cbb45f3569b9aa50586699c07d24fe7a79388b); refusing to apply
+maatctl: plan 01a1783a-d7e7-73d7-b162-b871be7aa9d4 changed after it was proposed (digest sha256:bb639f8fccb76183a385ea0fefe8df8b9be13247ac2bcd18d8ca2ded9849afc4, proposal recorded sha256:e3dfc66eb216a6e7147aa821a79f977d5ae7aff12644af62e54d7a0f73d7a265); refusing to apply
 
-$ maatctl apply 01a177e3-133c-7fd6-a79d-08c69881e204    # no polkit rule: pkttyagent prompts on the terminal; a wrong password is typed
+$ maatctl apply 01a1783a-d7eb-7494-aab9-b37bdb101399    # no polkit rule: pkttyagent prompts on the terminal; a wrong password is typed
 Applying (polkit may ask for administrator authentication)...
 ==== AUTHENTICATING FOR org.freedesktop.systemd1.manage-units ====
 Authentication is required to restart 'maat-demo.service'.
@@ -62,19 +62,19 @@ polkit.addRule(function(action, subject) {
     }
 });
 
-$ maatctl apply 01a177e3-1339-7b7e-88c8-d2cf1aed91fd    # authorized by the scoped rule above
-> 01a177e3-1339-7b7e-88c8-d2cf1aed91fd
+$ maatctl apply 01a1783a-d7e7-73d7-b162-b871be7aa9d4    # authorized by the scoped rule above
+> 01a1783a-d7e7-73d7-b162-b871be7aa9d4
   [ok] unit.active_state(maat-stale.service) == failed (actual: failed)
 Applying (polkit may ask for administrator authentication)...
 Verifying...
   [ok] unit.active_state(maat-stale.service) != failed (actual: inactive (not loaded))
 
-Done. Plan 01a177e3-1339-7b7e-88c8-d2cf1aed91fd applied and verified.
+Done. Plan 01a1783a-d7e7-73d7-b162-b871be7aa9d4 applied and verified.
 
 $ maatctl list
 PLAN ID                               KIND                  STATUS       PARAMS
-01a177e3-1339-7b7e-88c8-d2cf1aed91fd  service.reset-failed  applied      map[unit:maat-stale.service]
-01a177e3-133c-7fd6-a79d-08c69881e204  service.restart       failed       map[unit:maat-demo.service]
+01a1783a-d7e7-73d7-b162-b871be7aa9d4  service.reset-failed  applied      map[unit:maat-stale.service]
+01a1783a-d7eb-7494-aab9-b37bdb101399  service.restart       failed       map[unit:maat-demo.service]
 
 $ maat trail verify
 Trail: /home/lima.linux/snap/maat/common/trail/trail.jsonl
@@ -83,6 +83,7 @@ Chain OK: true
 Journal checkpoints checked: 7 (OK: true)
   warning: the journal holds 2 checkpoint(s) of trail 0911184656 that is not this file (up to record 2). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
   warning: the journal holds 7 checkpoint(s) of trail 0e53764b37 that is not this file (up to record 7). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
+  warning: the journal holds 7 checkpoint(s) of trail 1a20c6b804 that is not this file (up to record 7). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
   warning: the journal holds 11 checkpoint(s) of trail 5756b06877 that is not this file (up to record 11). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
 
 $ # tamper 3: delete the newest three records from the trail, then verify
@@ -95,5 +96,6 @@ Journal checkpoints checked: 7 (OK: false)
   PROBLEM: the journal has a checkpoint for record 7, but the trail ends at record 4: records were removed from the end
   warning: the journal holds 2 checkpoint(s) of trail 0911184656 that is not this file (up to record 2). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
   warning: the journal holds 7 checkpoint(s) of trail 0e53764b37 that is not this file (up to record 7). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
+  warning: the journal holds 7 checkpoint(s) of trail 1a20c6b804 that is not this file (up to record 7). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
   warning: the journal holds 11 checkpoint(s) of trail 5756b06877 that is not this file (up to record 11). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
 maat: trail verification found tampering
