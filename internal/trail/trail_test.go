@@ -89,20 +89,94 @@ func TestTamperDetectedByCheckpointAfterRewrite(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		tr.AppendAndCheckpoint(Record{Type: TypeExecution, Actor: "maatctl", Summary: "did a thing"})
 	}
-	// Attacker rewrites the whole file into a clean, self-consistent chain
-	// (different content, recomputed hashes) but cannot delete the journal
-	// checkpoints that recorded the original head hashes.
-	forged := forgeChain(3)
+	// Attacker keeps the first record (so the trail ID is unchanged) but rewrites
+	// the rest into a clean, self-consistent chain with recomputed hashes. The
+	// journal checkpoints of the original hashes can't be deleted.
+	recs, _ := tr.ReadAll()
+	forged := forgeChainAfter(recs[0], 3)
 	rewriteRaw(t, tr.Path, forged)
 
 	res, _ := tr.Verify(context.Background())
-	if res.ChainOK && res.CheckpointsOK {
-		t.Fatal("a full rewrite escaped both the chain and the checkpoints")
+	if !res.ChainOK {
+		t.Fatalf("the forged chain should be internally consistent: %v", res.Problems)
 	}
-	// The chain itself is internally consistent after forging, so detection must
-	// come from the checkpoints.
-	if res.CheckpointsOK {
+	// So detection must come from the checkpoints.
+	if res.CheckpointsOK || res.OK() {
 		t.Errorf("checkpoint cross-check failed to catch the rewrite: %+v (checkpoints=%d)", res, len(*cps))
+	}
+}
+
+func TestTruncationDetected(t *testing.T) {
+	tr, _ := newTestTrail(t)
+	for i := 0; i < 5; i++ {
+		tr.AppendAndCheckpoint(Record{Type: TypeApproval, Actor: "maatctl"})
+	}
+	// Drop the last two records: what an attacker hiding a recent action does.
+	// The remaining chain is perfectly valid on its own.
+	recs, _ := tr.ReadAll()
+	rewriteFile(t, tr.Path, recs[:3])
+
+	res, _ := tr.Verify(context.Background())
+	if !res.ChainOK {
+		t.Fatalf("a truncated chain is still internally valid: %v", res.Problems)
+	}
+	if res.OK() {
+		t.Fatal("removing the newest records went undetected")
+	}
+	if !strings.Contains(strings.Join(res.Problems, "\n"), "removed from the end") {
+		t.Errorf("expected a truncation problem, got %v", res.Problems)
+	}
+}
+
+func TestOtherUsersCheckpointsIgnored(t *testing.T) {
+	tr, cps := newTestTrail(t)
+	tr.AppendAndCheckpoint(Record{Type: TypeProposal, Actor: "maat-mcp"})
+	// Another local user writes entries that look like checkpoints for this trail.
+	recs, _ := tr.ReadAll()
+	*cps = append(*cps, map[string]string{
+		"_UID": "999999", "MAAT_TRAIL_ID": recs[0].Hash, "MAAT_TRAIL_HEAD": "1", "MAAT_TRAIL_HASH": "sha256:forged",
+	}, map[string]string{
+		"_UID": "999999", "MAAT_TRAIL_ID": recs[0].Hash, "MAAT_TRAIL_HEAD": "7", "MAAT_TRAIL_HASH": "sha256:forged",
+	})
+	res, _ := tr.Verify(context.Background())
+	if !res.OK() || len(res.Warnings) != 0 {
+		t.Fatalf("another user's journal entries must not affect verification: %+v", res)
+	}
+}
+
+func TestReinstallIsAWarningNotTampering(t *testing.T) {
+	tr, cps := newTestTrail(t)
+	for i := 0; i < 4; i++ {
+		tr.AppendAndCheckpoint(Record{Type: TypeObservation, Actor: "maat"})
+	}
+	old := append([]map[string]string(nil), *cps...)
+
+	// The data directory is wiped (snap remove deletes it) and a new trail starts,
+	// while the old checkpoints stay in the journal.
+	os.Remove(tr.Path)
+	*cps = old
+	tr.AppendAndCheckpoint(Record{Type: TypeProposal, Actor: "maat-mcp"})
+
+	res, _ := tr.Verify(context.Background())
+	if !res.OK() {
+		t.Fatalf("a fresh trail should verify: %v", res.Problems)
+	}
+	if res.CheckpointsChecked != 1 {
+		t.Errorf("only the new trail's checkpoint should be checked, got %d", res.CheckpointsChecked)
+	}
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "up to record 4") {
+		t.Errorf("the earlier trail should be reported as a warning, got %v", res.Warnings)
+	}
+}
+
+func TestCheckpointsCarryTrailID(t *testing.T) {
+	tr, cps := newTestTrail(t)
+	a, _ := tr.AppendAndCheckpoint(Record{Type: TypeProposal, Actor: "x"})
+	tr.AppendAndCheckpoint(Record{Type: TypeApproval, Actor: "x"})
+	for _, cp := range *cps {
+		if cp["MAAT_TRAIL_ID"] != a.Hash {
+			t.Errorf("checkpoint trail ID %q, want the genesis hash %q", cp["MAAT_TRAIL_ID"], a.Hash)
+		}
 	}
 }
 
@@ -175,13 +249,13 @@ func rewriteRaw(t *testing.T, path string, recs []Record) {
 	rewriteFile(t, path, recs)
 }
 
-// forgeChain builds an internally valid chain of n records whose content differs
-// from any real trail (so the chain check passes, but recorded checkpoints of
-// the real hashes will not match).
-func forgeChain(n int) []Record {
-	var recs []Record
-	prev := "sha256:" + strings.Repeat("0", 64)
-	for i := 0; i < n; i++ {
+// forgeChainAfter builds an internally valid chain of n records that starts with
+// the real first record and continues with forged content, so the chain check
+// passes but recorded checkpoints of the real hashes will not match.
+func forgeChainAfter(first Record, n int) []Record {
+	recs := []Record{first}
+	prev := first.Hash
+	for i := 1; i < n; i++ {
 		r := Record{Seq: i + 1, Type: TypeObservation, Actor: "attacker", Summary: "nothing to see here", Prev: prev}
 		h, _ := computeHash(r)
 		r.Hash = h

@@ -1,25 +1,31 @@
 maat self-test — confined in snap maat
 
+[PASS] not_root
+       expect: maat runs as a normal user, so file permissions back up the confinement
+       observed: running as uid 502
 [PASS] journal_readable
        expect: maat can read the system journal
        observed: read 1 entry/entries from the journal
 [PASS] units_listable
        expect: maat can list systemd units over D-Bus
-       observed: listed 559 units
+       observed: listed 502 units
 [PASS] network_blocked
-       expect: the confined server cannot open an outbound network connection
-       observed: outbound TCP connect was refused: dial tcp 1.1.1.1:443: socket: permission denied
-[PASS] filesystem_read_only
-       expect: the confined server cannot write to the host filesystem
-       observed: write to /etc was refused: open /etc/maat-selftest-probe: permission denied
+       expect: the server cannot create internet sockets (TCP or UDP, IPv4 or IPv6)
+       observed: refused by policy: tcp4: dial tcp4 127.0.0.1:9: socket: permission denied; tcp6: dial tcp6 [::1]:9: socket: permission denied; udp4: dial udp4 127.0.0.1:9: socket: permission denied
+[PASS] home_write_blocked
+       expect: the server cannot write the user's files
+       observed: write to /home/lima.linux was refused: open /home/lima.linux/.maat-selftest-probe-389969: permission denied
 [PASS] systemd_control_denied
-       expect: the confined server cannot restart systemd units
-       observed: RestartUnit was refused: An AppArmor policy prevents this sender from sending this message to this recipient; type="method_call", sender=":1.121" (uid=502 pid=219925 comm="/snap/maat/x4/bin/maat selftest" label="snap.maat.maat (enforce)") interface="org.freedesktop.systemd1.Manager" member="RestartUnit" error name="(unset)" requested_reply="0" destination="org.freedesktop.systemd1" (uid=0 pid=1 comm="/sbin/init" label="unconfined")
-[PASS] network_state_readable
-       expect: informational: can the network collector read links/routes?
-       observed: no (fails closed): exit status 1
-[PASS] sockets_readable
-       expect: informational: can listening sockets be read from /proc/net?
-       observed: yes: 0 sockets
+       expect: AppArmor stops the server from restarting systemd units
+       observed: refused by AppArmor: An AppArmor policy prevents this sender from sending this message to this recipient; type="method_call", sender=":1.720" (uid=502 pid=389969 comm="/snap/maat/x6/bin/maat selftest" label="snap.maat.maat (enforce)") interface="org.freedesktop.systemd1.Manager" member="RestartUnit" error name="(unset)" requested_reply="0" destination="org.freedesktop.systemd1" (uid=0 pid=1 comm="/usr/lib/systemd/systemd --system --deserialize=67" label="unconfined")
+[INFO] disk_view
+       expect: informational: disk_usage sees the host's filesystems
+       observed: yes: 9 filesystems; / is ext4 on /dev/vda1, 19.2% used
+[INFO] network_state
+       expect: informational: what network_state can read
+       observed: interface names and counters only (4 interfaces); addresses and routes need network-observe, which maat does not use
+[INFO] listening_sockets
+       expect: informational: whether listening sockets can be read from /proc/net
+       observed: no (the tool fails closed with an explanation)
 
-7 passed, 0 failed
+6 passed, 0 failed, 3 informational

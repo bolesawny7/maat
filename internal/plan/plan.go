@@ -6,8 +6,10 @@
 package plan
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/bolesawny7/maat/internal/obs"
@@ -17,19 +19,35 @@ import (
 // old plan files are rejected rather than misread.
 const SchemaVersion = "maat.plan/v0"
 
+// Limits on the model-supplied parts of a plan. A plan is shown to a person, so
+// unbounded text is both a denial of service and room for social engineering.
+const (
+	MaxRationaleBytes = 4000
+	MaxEvidence       = 32
+)
+
+var (
+	uuidRe       = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	evidenceIDRe = regexp.MustCompile(`^ev_[0-9a-f]{6,16}$`)
+)
+
 // Plan is a proposed change, pending human review.
 type Plan struct {
-	Schema        string        `json:"schema"`
-	ID            string        `json:"id"`
-	Kind          string        `json:"kind"`
-	Params        Params        `json:"params"`
-	Preconditions []Check       `json:"preconditions"`
-	Verify        []Check       `json:"verify"`
-	Rollback      Rollback      `json:"rollback"`
-	Evidence      []string      `json:"evidence"`
-	Rationale     obs.Untrusted `json:"rationale"`
-	CreatedAt     time.Time     `json:"created_at"`
-	Proposer      Proposer      `json:"proposer"`
+	Schema        string   `json:"schema"`
+	ID            string   `json:"id"`
+	Kind          string   `json:"kind"`
+	Params        Params   `json:"params"`
+	Preconditions []Check  `json:"preconditions"`
+	Verify        []Check  `json:"verify"`
+	Rollback      Rollback `json:"rollback"`
+	Evidence      []string `json:"evidence"`
+	// EvidenceDetail is the server's record of what each cited ID referred to.
+	// IDs in Evidence without an entry here were not issued by the server
+	// session that recorded the plan.
+	EvidenceDetail []obs.EvidenceRef `json:"evidence_detail,omitempty"`
+	Rationale      obs.Untrusted     `json:"rationale"`
+	CreatedAt      time.Time         `json:"created_at"`
+	Proposer       Proposer          `json:"proposer"`
 }
 
 // Params holds the parameters of an action. It is a string map so the MCP tool
@@ -72,6 +90,9 @@ func NewProposal(kind string, params Params, evidence []string, rationale obs.Un
 	if err := spec.validateParams(params); err != nil {
 		return nil, err
 	}
+	if err := validateModelText(evidence, rationale); err != nil {
+		return nil, err
+	}
 	pre, verify, rb := spec.Build(params)
 	p := &Plan{
 		Schema:        SchemaVersion,
@@ -90,20 +111,112 @@ func NewProposal(kind string, params Params, evidence []string, rationale obs.Un
 }
 
 // Validate re-checks a plan from scratch. The actuator calls this on a plan read
-// from disk, trusting nothing the server wrote: it confirms the schema, that the
-// kind is still in the catalog, and that the parameters are valid.
+// from disk, trusting nothing the server wrote: it confirms the schema, the ID
+// format, that the kind is still in the catalog, that the parameters and the
+// model-supplied text are valid, and that the preconditions, verification and
+// rollback are exactly what the catalog derives for these parameters. A plan
+// whose safety steps were edited on disk is rejected rather than executed.
 func (p *Plan) Validate() error {
 	if p.Schema != SchemaVersion {
 		return fmt.Errorf("unsupported plan schema %q (want %q)", p.Schema, SchemaVersion)
 	}
-	if p.ID == "" {
-		return fmt.Errorf("plan has no id")
+	if !uuidRe.MatchString(p.ID) {
+		return fmt.Errorf("plan id %q is not a UUID", p.ID)
 	}
 	spec, ok := Catalog[p.Kind]
 	if !ok {
 		return fmt.Errorf("unknown action kind %q", p.Kind)
 	}
-	return spec.validateParams(p.Params)
+	if err := spec.validateParams(p.Params); err != nil {
+		return err
+	}
+	if err := validateModelText(p.Evidence, p.Rationale); err != nil {
+		return err
+	}
+	if len(p.Proposer.Client) > 128 || len(p.Proposer.Model) > 128 {
+		return fmt.Errorf("proposer fields are too long")
+	}
+	if err := validateEvidenceDetail(p.Evidence, p.EvidenceDetail); err != nil {
+		return err
+	}
+	pre, verify, rb := spec.Build(p.Params)
+	if !sameJSON(p.Preconditions, pre) || !sameJSON(p.Verify, verify) || !sameJSON(p.Rollback, rb) {
+		return fmt.Errorf("the plan's preconditions, verification or rollback differ from what the catalog derives for %s; the plan file was altered after it was proposed", p.Kind)
+	}
+	return nil
+}
+
+func validateModelText(evidence []string, rationale obs.Untrusted) error {
+	if len(evidence) > MaxEvidence {
+		return fmt.Errorf("too many evidence IDs (%d, at most %d)", len(evidence), MaxEvidence)
+	}
+	for _, id := range evidence {
+		if !evidenceIDRe.MatchString(id) {
+			return fmt.Errorf("evidence %q is not an evidence ID; cite the ev_... values returned by maat's tools", truncateForError(id))
+		}
+	}
+	if len(rationale) > MaxRationaleBytes {
+		return fmt.Errorf("rationale is too long (%d bytes, at most %d)", len(rationale), MaxRationaleBytes)
+	}
+	return nil
+}
+
+// MaxExcerptBytes bounds each evidence excerpt stored in a plan.
+const MaxExcerptBytes = 1024
+
+// AttachEvidence records what the cited evidence IDs referred to. Only refs for
+// IDs the plan actually cites are kept.
+func (p *Plan) AttachEvidence(refs []obs.EvidenceRef) error {
+	cited := map[string]bool{}
+	for _, id := range p.Evidence {
+		cited[id] = true
+	}
+	var keep []obs.EvidenceRef
+	for _, r := range refs {
+		if cited[r.ID] {
+			keep = append(keep, r)
+			delete(cited, r.ID)
+		}
+	}
+	if err := validateEvidenceDetail(p.Evidence, keep); err != nil {
+		return err
+	}
+	p.EvidenceDetail = keep
+	return nil
+}
+
+func validateEvidenceDetail(evidence []string, detail []obs.EvidenceRef) error {
+	cited := map[string]bool{}
+	for _, id := range evidence {
+		cited[id] = true
+	}
+	if len(detail) > len(cited) {
+		return fmt.Errorf("more evidence details than cited evidence")
+	}
+	for _, d := range detail {
+		if !cited[d.ID] {
+			return fmt.Errorf("evidence detail for %q, which the plan does not cite", truncateForError(d.ID))
+		}
+		if len(d.Source) > 64 || len(d.Subject) > 256 || len(d.Excerpt) > MaxExcerptBytes {
+			return fmt.Errorf("evidence detail for %s is too long", d.ID)
+		}
+	}
+	return nil
+}
+
+// sameJSON compares two values by their JSON encoding, which is how plans are
+// stored, so nil and empty optional fields compare equal.
+func sameJSON(a, b any) bool {
+	ja, errA := json.Marshal(a)
+	jb, errB := json.Marshal(b)
+	return errA == nil && errB == nil && bytes.Equal(ja, jb)
+}
+
+func truncateForError(s string) string {
+	if len(s) > 40 {
+		return s[:40] + "..."
+	}
+	return s
 }
 
 // Marshal renders the plan as indented JSON for storage.

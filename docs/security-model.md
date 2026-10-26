@@ -1,6 +1,6 @@
 # Security model
 
-maat's job is to let a model look at a real machine without being able to hurt it. This document says precisely what that means: what's protected, from whom, how, and what risk is left over. It's a design document. The invariants at the end become automated checks once code exists. Facts (F) and assumptions (A) are defined in [references.md](references.md).
+maat's job is to let a model look at a real machine without being able to hurt it. This document says precisely what that means: what's protected, from whom, how, and what risk is left over. The invariants at the end say which are enforced by an automated test and which are not yet. Facts (F) and assumptions (A) are defined in [references.md](references.md).
 
 ## What we protect
 
@@ -33,7 +33,8 @@ Out of scope: root, kernel exploits, a compromised MCP client, and a compromised
 maat secures its own tools, not the rest of your MCP client. If the client also gives the model a general shell, the model can do anything that shell allows. That includes running `maatctl` itself and riding on a cached polkit authorization (see T6). For the guarantees on this page to hold:
 
 - Run the agent with maat's tools only, or with shell access turned off. The benchmark always runs this way.
-- Run `maatctl` yourself, in your own terminal, never through the agent.
+- Run `maatctl` yourself, in your own terminal, never through the agent. Its confirmation reads the controlling terminal, which stops a piped answer, but a shell tool that allocates a pseudo-terminal could still type one.
+- Run `maat mcp` as your own user, not root (it refuses root).
 - On machines with sensitive data, use a local model.
 
 ## Threats and mitigations
@@ -41,11 +42,12 @@ maat secures its own tools, not the rest of your MCP client. If the client also 
 ### T1. Prompt injection makes the model propose something harmful
 
 - The server can't act. Its plugs grant reads only (F2, F3), and it has no network.
-- Only catalog actions can be proposed, and their parameters are validated.
-- A person reviews a preview with the cited evidence, and polkit asks for admin authentication.
-- Untrusted text is fenced in tool output, and the benchmark measures how often injection still succeeds.
+- Only catalog actions can be proposed, and their parameters are validated. The service actions accept only `.service` units, so a log line can't talk the model into proposing `reboot.target`, and `service.restart` requires the unit to be failed.
+- A person reviews the plan with the cited evidence: `maatctl show` prints the excerpt the server recorded for each evidence ID, and flags IDs the server never issued, so a fabricated justification stands out.
+- polkit asks for admin authentication, or follows a rule the admin scoped to one unit and verb.
+- Untrusted text is returned in data fields, never spliced into instructions, and the server's instructions say so. This reduces injection but can't prevent it; the benchmark exists to measure how often it still succeeds, and that measurement has not been made with real models yet.
 
-**Residual risk:** a person can approve a bad plan. The preview shows evidence IDs so the reasoning can be checked against the raw data.
+**Residual risk:** a person can approve a bad plan. The rationale is labelled as the model's claim, and the evidence is shown so the reasoning can be checked.
 
 ### T2. Secrets in logs leave the machine
 
@@ -59,18 +61,24 @@ maat secures its own tools, not the rest of your MCP client. If the client also 
 
 - Confinement limits the damage to what the plugs allow.
 - Parsers are fuzz-tested with hostile input: injection strings, very long lines, invalid UTF-8.
+- `log-observe` also allows writing `kernel.printk_ratelimit` and AppArmor's audit setting, and grants the `dac_override` and `dac_read_search` capabilities (F3). Code that had taken over the server could, for example, set AppArmor auditing to quiet. But both files are writable by root only (`0644` and `0600`, owned by root), and capabilities only take effect for a process that has them, so `maat mcp` refuses to run as root: as a normal user, ordinary file permissions block those writes whatever AppArmor allows. maat's code never references the paths, and a test enforces that.
 
-**Residual risk:** `log-observe` also allows writing `kernel.printk_ratelimit` and AppArmor's audit setting, and it grants the `dac_override` and `dac_read_search` capabilities (F3). Code that has taken over the server could, for example, set AppArmor auditing to quiet. maat never touches these paths and a test enforces that. Landlock self-restriction is being evaluated as an extra layer (A13).
+**Residual risk:** someone running the server as root anyway (by changing the code, say) would get the full `log-observe` grant. Landlock self-restriction is being evaluated as an extra layer (A13).
 
-### T4. A plan is changed between review and execution
+### T4. A plan is changed after it was proposed, or between review and execution
 
-- `maatctl` reads the plan once, hashes it, shows the hash, and executes only from its in-memory copy.
-- Preconditions are re-checked immediately before execution.
-- The plan's digest goes into the trail.
+Plan files live in a directory that the confined server, and any process running as the user, can write.
+
+- The server records the SHA-256 of the exact bytes it wrote in the plan's proposal record. `maatctl apply` reads the file once, hashes it, refuses it if the digest differs from the proposal record (or there is no proposal record), and executes only from its in-memory copy. `maatctl show` prints the digest and whether it matches.
+- Whatever the file says, `maatctl` re-derives the preconditions, verification and rollback from the catalog and refuses a plan whose stored steps differ, so a plan can't be edited into one with weaker checks or a different target.
+- A file whose name and embedded plan ID disagree is refused.
+- Preconditions are re-checked after the confirmation, immediately before execution.
+
+**Residual risk:** a compromised server can write a proposal record for a plan it later changes, since it writes both. The re-derived safety steps still bound what such a plan can do.
 
 ### T5. `maatctl` is tricked into acting on the wrong target
 
-- Parameters are validated strictly for each kind: valid systemd unit names for loaded units, valid snap names.
+- Parameters are validated strictly for each kind: `.service` unit names, valid snap names. Whether the unit exists and is failed is a precondition checked against the live system.
 - Calls go through typed D-Bus and REST APIs. Nothing passes through a shell.
 
 ### T6. Approval fatigue and cached authorization
@@ -83,11 +91,11 @@ maat secures its own tools, not the rest of your MCP client. If the client also 
 
 ### T7. Someone tampers with the trail
 
-- A hash chain, plus journal checkpoints that unprivileged processes can't delete.
-- Trusted journal fields identify which program wrote each checkpoint (F14).
+- A hash chain, plus journal checkpoints that unprivileged processes can't delete. Checkpoints carry the trail's ID, and verification only trusts checkpoints whose journald-assigned `_UID` is the user's, so another local user can't forge or spam them (F14).
+- Edits, deletions and reordering break the chain. Removing the newest records (the likeliest way to hide an action) leaves checkpoints beyond the end of the file, which verification reports. Both were tested on a VM ([evidence](evidence/maatctl-end-to-end.txt)).
 - Optional journald Forward Secure Sealing (F13).
 
-**Residual risk:** root can rewrite everything, and checkpoints disappear when the journal's retention period expires.
+**Residual risk:** replacing the whole trail file with a new, self-consistent one is reported only as a warning ("checkpoints of a trail that is not this file"), because a reinstall of the snap, which deletes its data, looks the same. Root can rewrite everything, and checkpoints disappear when the journal's retention period expires.
 
 ### T8. maat causes an outage
 
@@ -98,21 +106,28 @@ maat secures its own tools, not the rest of your MCP client. If the client also 
 ### T9. Supply chain
 
 - Few dependencies, pinned in `go.sum`, with `govulncheck` in CI and release artifacts built in CI.
-- The benchmark's auto-confirm code exists only in builds with the `maatbench` tag, and CI fails if a release artifact contains it.
+- The benchmark's auto-confirm code exists only in builds with the `maatbench` tag, and a test builds a release `maatctl` and fails if the binary contains it.
+
+### T10. Untrusted text attacks the reviewer's terminal
+
+A plan's rationale, a log line or a unit description can carry ANSI escape sequences that move the cursor and repaint lines the reviewer already read ("Parameters: nginx.service" over the real target), bidirectional overrides that reorder text, or invalid UTF-8.
+
+- `maatctl` and `maat diagnose` print every untrusted string through one function that escapes C0 and C1 control characters, bidirectional and zero-width format characters, and invalid bytes (`internal/termsafe`, fuzz-tested). The [end-to-end evidence](evidence/maatctl-end-to-end.txt) shows a hostile rationale rendered harmless.
+- Plan text is bounded: at most 4,000 bytes of rationale and 32 evidence IDs of the form `ev_…`.
 
 ## Security invariants
 
-These are the properties maat promises. Each becomes an automated check:
+These are the properties maat promises, and how each is enforced today:
 
-1. The snap declares no `network` plug. (`TestNoNetworkPlug`)
-2. The snap's plugs are a subset of `log-observe`, `system-observe` and `mount-observe`. `network-observe` is deliberately excluded because it permits outbound TCP (F28); any later addition requires a change to this document. (`TestOnlyApprovedPlugs`)
-3. No code path executes a shell or builds a command line from strings.
-4. No code path writes to `/proc/sys/kernel/printk_ratelimit` or `/sys/module/apparmor/parameters/audit`.
-5. Every tool's output passes through redaction and budgeting.
-6. Every action kind implements preview, apply and verify, plus a rollback or a documented reason it has none.
-7. `maatctl` exits with an error when run as root.
-8. Release artifacts contain no auto-confirm code.
-9. After every benchmark run, `maat trail verify` passes.
+1. The snap declares no `network` plug. Automated: `TestNoNetworkPlug`.
+2. The snap's plugs are a subset of `log-observe`, `system-observe` and `mount-observe`. `network-observe` is deliberately excluded because it permits outbound TCP (F28); any later addition requires a change to this document. Automated: `TestOnlyApprovedPlugs`.
+3. No code path executes a shell or builds a command line from strings. Automated, as a source scan: `TestNoShellExecution`.
+4. No code path writes to the two settings `log-observe` makes writable. Automated, as a source scan: `TestNoWritesToSensitiveLogObservePaths`. Backed at run time by invariant 7.
+5. Every tool's output passes through redaction, clipping and budgeting. Not automated: each handler calls the shared `redact` and `fit` helpers, and reviewers check new tools for it (see the checklist in [AGENTS.md](../AGENTS.md)).
+6. Every executable action kind has catalog-derived preconditions and verification, an Execute case, checks the actuator can evaluate, and a rollback or a stated reason for none. Automated: `TestActionKindsComplete`. (`snap.revert`'s rollback case exists but reports that it is not automated yet.)
+7. `maatctl` and `maat mcp` exit with an error when run as root. Automated, as a source check: `TestRefusesRoot`.
+8. Release builds contain no auto-confirm code. Automated: `TestReleaseBinaryHasNoAutoConfirm` builds `maatctl` with and without the `maatbench` tag and scans both binaries.
+9. After every benchmark attempt, `maat trail verify` passes. Checked by the harness and reported as `trail_ok` in every score.
 
 ## Reporting a vulnerability
 

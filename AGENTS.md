@@ -11,7 +11,7 @@ maat is a confined, auditable MCP server and toolkit for diagnosing and repairin
 3. [docs/security-model.md](docs/security-model.md)
 4. [docs/references.md](docs/references.md)
 
-**Current status: working developer preview.** The server, CLIs, actuator, trail and benchmark are implemented and tested; the strict snap was built and verified on a VM (see [docs/evidence/](docs/evidence/)). A few items remain research-only (for example `netplan.try`); never describe those as done.
+**Current status: developer preview.** The server, CLIs, actuator, trail and benchmark harness are implemented and tested; the strict snap and the full review loop were verified on a VM (see [docs/evidence/](docs/evidence/)). No real model has been benchmarked yet. A few items remain research-only (for example `netplan.try`) or manual (`snap.revert` rollback); never describe those as done.
 
 ## Rules
 
@@ -24,31 +24,17 @@ maat is a confined, auditable MCP server and toolkit for diagnosing and repairin
 7. **Respect Canonical's trademark policy.** Don't put "Ubuntu" in project, package or command names, and don't imply that Canonical endorses maat (F26).
 8. **Keep the security invariants passing.** They're listed at the end of [docs/security-model.md](docs/security-model.md).
 
-## Repository layout (planned)
+## Repository layout
 
-```
-cmd/maat/            server and CLI, shipped in the snap
-cmd/maatctl/         plan review and execution, shipped outside the snap
-internal/collect/    journal, systemd, /proc, network, filesystems
-internal/condense/   redaction, fencing, Drain clustering, ranking, budgets
-internal/mcpserver/  tool definitions and handlers
-internal/plan/       schema, catalog, validation
-internal/actuate/    preview, apply, verify and rollback for each action kind
-internal/trail/      hash chain, locking, journal checkpoints, verification
-bench/               scenarios, harness, scoring
-snap/snapcraft.yaml  strict confinement and plugs
-docs/                design documents and references
-```
+See [docs/architecture.md](docs/architecture.md#repository-layout). In short: `cmd/maat` (server, in the snap), `cmd/maatctl` (actuator, outside it), `internal/*` (collectors, condense pipeline, MCP server, plans, plan store, actuator, trail, terminal sanitizing, self-test), `bench/` (scenarios, harness, results), `snap/`, `scripts/`, `docs/`.
 
-## Toolchain (planned)
+## Toolchain
 
-Update this section when the code scaffolding lands.
-
-- Go 1.26 or 1.27, the two currently supported releases (F19). Planned module path: `github.com/bolesawny7/maat`; change it if the repository lives elsewhere.
-- MCP: `github.com/modelcontextprotocol/go-sdk` v1.8 or later (F15).
-- Checks: `go test ./...`, `go vet ./...` and `govulncheck ./...`.
-- Snap: Snapcraft with strict confinement, installed and tested on Ubuntu 24.04 and 26.04.
-- Benchmark: LXD.
+- Go 1.26 or 1.27, the two currently supported releases (F19). Module path: `github.com/bolesawny7/maat`.
+- MCP: `github.com/modelcontextprotocol/go-sdk` v1.8 (F15).
+- Checks: `make all race`, `make fuzz`, and `govulncheck ./...`. Also vet the benchmark build: `go vet -tags maatbench ./cmd/maatctl`.
+- Snap: Snapcraft, base `core24`, strict confinement; tested on Ubuntu 24.04 (arm64). 26.04 is untested.
+- Benchmark: LXD; `make bench-bin` builds what it pushes into containers.
 
 ## Conventions
 
@@ -62,11 +48,14 @@ Update this section when the code scaffolding lands.
 
 ### Adding an MCP tool
 
-- [ ] Name the snap interface that covers the data, and cite its F-entry, or add an A-entry and test it.
-- [ ] Output goes through the condense pipeline, with `max_tokens` support and evidence IDs.
+- [ ] Name the snap interface that covers the data, and cite its F-entry, or add an A-entry and test it **inside the snap** (`maat selftest`, or a call through the confined server). Unconfined runs, including the benchmark, don't prove anything about confinement.
+- [ ] If the data can't be read under the snap, return an error that says why. Never return an empty result for something you couldn't read.
+- [ ] Attacker-influenced text goes through `redact` (redaction and clipping); lists go through `fit` with `max_items` and `max_chars`.
+- [ ] Every item carries an `evidence_id`, and the handler registers it with `d.evidence.add` so `propose_action` can attach it to a plan.
 - [ ] Annotations are set honestly.
 - [ ] Fixture-based tests, including hostile input: injection strings, very long lines, invalid UTF-8.
 - [ ] The tool table in the README is updated.
+- [ ] Anything printed to a terminal goes through `internal/termsafe`.
 
 ### Adding an action kind
 

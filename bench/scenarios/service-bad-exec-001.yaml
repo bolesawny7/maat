@@ -1,5 +1,6 @@
 id: service-bad-exec-001
 title: A service fails because its executable does not exist
+symptom: "Our monitoring says a service on this machine is failing."
 instance: container
 image: ubuntu:24.04
 setup:

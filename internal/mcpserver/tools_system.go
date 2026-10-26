@@ -8,6 +8,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/bolesawny7/maat/internal/collect"
+	"github.com/bolesawny7/maat/internal/obs"
 )
 
 // ---- system_overview ----
@@ -15,6 +16,7 @@ import (
 type overviewIn struct{}
 
 type overviewOut struct {
+	EvidenceID  string           `json:"evidence_id"`
 	Overview    collect.Overview `json:"overview"`
 	FailedUnits []string         `json:"failed_units,omitempty"`
 }
@@ -31,9 +33,11 @@ func (d *Deps) systemOverview(ctx context.Context, _ *mcp.CallToolRequest, _ ove
 		}
 	}
 	ov := collect.CollectOverview("/", len(failedNames))
-	out := overviewOut{Overview: ov, FailedUnits: failedNames}
-	return textResult(fmt.Sprintf("%s, kernel %s, up %s, load %.2f, mem %.0f%% used, %d failed units",
-		ov.OSRelease, ov.KernelRelease, ov.Uptime, ov.Load1, ov.MemUsedPct, ov.FailedUnits)), out, nil
+	summary := fmt.Sprintf("%s, kernel %s, up %s, load %.2f, mem %.0f%% used, %d failed units",
+		ov.OSRelease, ov.KernelRelease, ov.Uptime, ov.Load1, ov.MemUsedPct, ov.FailedUnits)
+	out := overviewOut{EvidenceID: obs.EvidenceID("overview"), Overview: ov, FailedUnits: failedNames}
+	d.evidence.add(out.EvidenceID, "overview", ov.Hostname, summary)
+	return textResult(summary), out, nil
 }
 
 // ---- list_units ----
@@ -41,6 +45,7 @@ func (d *Deps) systemOverview(ctx context.Context, _ *mcp.CallToolRequest, _ ove
 type listUnitsIn struct {
 	OnlyFailed bool `json:"only_failed" jsonschema:"if true, return only failed units"`
 	Max        int  `json:"max,omitempty" jsonschema:"cap on the number of units returned"`
+	MaxChars   int  `json:"max_chars,omitempty"`
 }
 
 type listUnitsOut struct {
@@ -56,14 +61,13 @@ func (d *Deps) listUnits(ctx context.Context, _ *mcp.CallToolRequest, in listUni
 	if err != nil {
 		return errResult(err), listUnitsOut{}, nil
 	}
-	out := listUnitsOut{Total: len(units), Units: units}
-	max := in.Max
-	if max <= 0 {
-		max = d.effectiveBudget(0, 0).MaxItems
+	for i := range units {
+		units[i].Description = d.redact(units[i].Description)
 	}
-	if len(out.Units) > max {
-		out.Units = out.Units[:max]
-		out.Truncated = true
+	out := listUnitsOut{Total: len(units)}
+	out.Units, out.Truncated = fit(units, d.effectiveBudget(in.Max, in.MaxChars))
+	for _, u := range out.Units {
+		d.evidence.add(u.EvidenceID, "unit", u.Name, fmt.Sprintf("%s: %s/%s (load %s)", u.Name, u.ActiveState, u.SubState, u.LoadState))
 	}
 	return textResult(fmt.Sprintf("%d units (%d shown)", out.Total, len(out.Units))), out, nil
 }
@@ -84,24 +88,37 @@ func (d *Deps) unitStatus(ctx context.Context, _ *mcp.CallToolRequest, in unitSt
 	if err != nil {
 		return errResult(err), collect.UnitStatus{}, nil
 	}
-	return textResult(fmt.Sprintf("%s: %s (%s), result=%s, restarts=%d", st.Name, st.ActiveState, st.SubState, st.Result, st.NRestarts)), st, nil
+	st.Description = d.redact(st.Description)
+	summary := unitSummary(st)
+	d.evidence.add(st.EvidenceID, "unit", st.Name, summary)
+	return textResult(summary), st, nil
+}
+
+func unitSummary(st collect.UnitStatus) string {
+	return fmt.Sprintf("%s: %s/%s (load %s), result=%s, exit status %d, restarts=%d",
+		st.Name, st.ActiveState, st.SubState, st.LoadState, st.Result, st.ExecMainStatus, st.NRestarts)
 }
 
 // ---- top_processes ----
 
 type topIn struct {
 	Max      int `json:"max,omitempty"`
-	SampleMs int `json:"sample_ms,omitempty" jsonschema:"CPU sampling interval in milliseconds; default 300"`
+	SampleMs int `json:"sample_ms,omitempty" jsonschema:"CPU sampling interval in milliseconds; default 300, at most 5000"`
+	MaxChars int `json:"max_chars,omitempty"`
 }
 
 type topOut struct {
 	Processes []collect.Process `json:"processes"`
+	Truncated bool              `json:"truncated,omitempty"`
 }
 
 func (d *Deps) topProcesses(ctx context.Context, _ *mcp.CallToolRequest, in topIn) (*mcp.CallToolResult, topOut, error) {
 	sample := time.Duration(in.SampleMs) * time.Millisecond
 	if sample <= 0 {
 		sample = 300 * time.Millisecond
+	}
+	if sample > 5*time.Second {
+		sample = 5 * time.Second
 	}
 	max := in.Max
 	if max <= 0 {
@@ -111,5 +128,13 @@ func (d *Deps) topProcesses(ctx context.Context, _ *mcp.CallToolRequest, in topI
 	if err != nil {
 		return errResult(err), topOut{}, nil
 	}
-	return textResult(fmt.Sprintf("top %d processes by CPU", len(procs))), topOut{Processes: procs}, nil
+	for i := range procs {
+		procs[i].Cmdline = d.redact(procs[i].Cmdline)
+	}
+	var out topOut
+	out.Processes, out.Truncated = fit(procs, d.effectiveBudget(max, in.MaxChars))
+	for _, p := range out.Processes {
+		d.evidence.add(p.EvidenceID, "process", p.Comm, fmt.Sprintf("pid %d %s: %.1f%% CPU, %d MB RSS, %s", p.PID, p.Comm, p.CPUPct, p.RSSMB, p.Cmdline))
+	}
+	return textResult(fmt.Sprintf("top %d processes by CPU", len(out.Processes))), out, nil
 }

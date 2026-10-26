@@ -1,23 +1,30 @@
 id: service-stale-failure-001
-title: A unit is still marked failed after its cause is gone; clearing the state fixes it
+title: A failed unit lingers after its unit file was removed; clearing the failed state fixes it
+symptom: "Our monitoring keeps flagging a failed unit on this machine."
 instance: container
 image: ubuntu:24.04
+# The job fails once, then its unit file is deleted (as a package removal or a
+# cleanup would). systemd keeps the unit loaded as not-found and failed until
+# its failed state is reset; a restart can't work because the unit no longer
+# exists, so service.reset-failed is the only fix that passes.
 setup:
   - |
-    printf '[Unit]\nDescription=One-shot that failed once\n[Service]\nType=oneshot\nExecStart=/bin/false\n' > /etc/systemd/system/stale.service
+    printf '[Unit]\nDescription=Legacy report job\n[Service]\nType=oneshot\nExecStart=/bin/false\n' > /etc/systemd/system/legacy-report.service
   - systemctl daemon-reload
-  - systemctl start stale.service || true
+  - systemctl start legacy-report.service || true
+  - rm /etc/systemd/system/legacy-report.service
+  - systemctl daemon-reload
 truth:
   root_cause: service.stale_failure
-  component: stale.service
+  component: legacy-report.service
   evidence:
-    - source: journal
-      unit: stale.service
-      contains: "Failed with result"
+    - source: unit
+      unit: legacy-report.service
+      contains: "not-found"
 expect: fix
 acceptable_plans:
   - kind: service.reset-failed
     params:
-      unit: stale.service
-health_check: "! systemctl is-failed --quiet stale.service"
-real_world: "Units can linger in a failed state after the underlying problem is resolved; resetting clears it."
+      unit: legacy-report.service
+health_check: "! systemctl is-failed --quiet legacy-report.service"
+real_world: "Removed units keep showing in `systemctl --failed` as not-found until reset: https://unix.stackexchange.com/questions/192314"

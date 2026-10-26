@@ -71,12 +71,22 @@ type Untrusted string
 
 // EvidenceID returns a short, stable identifier for a piece of evidence,
 // derived from its defining parts. The same parts always yield the same ID, so
-// a diagnosis that cites "ev_7c1e09" can be checked against the record that
+// a diagnosis that cites "ev_7c1e09a2" can be checked against the record that
 // produced it. Parts should identify the evidence, not vary run to run: use a
 // source and a template, not a timestamp.
 func EvidenceID(parts ...string) string {
 	h := sha256.Sum256([]byte(strings.Join(parts, "\x1f")))
-	return "ev_" + hex.EncodeToString(h[:])[:6]
+	return "ev_" + hex.EncodeToString(h[:])[:8]
+}
+
+// EvidenceRef records what an evidence ID referred to when a tool returned it:
+// where it came from and a short, redacted excerpt. The server attaches these to
+// a plan so the person reviewing it sees the evidence itself, not just its ID.
+type EvidenceRef struct {
+	ID      string    `json:"id"`
+	Source  string    `json:"source"`            // e.g. "journal", "unit", "disk"
+	Subject string    `json:"subject,omitempty"` // unit name, mount point, profile...
+	Excerpt Untrusted `json:"excerpt"`
 }
 
 // Budget bounds how much a tool returns. Zero means "use the default".

@@ -1,0 +1,20 @@
+[
+  {
+    "role": "tool",
+    "tool": "disk_usage",
+    "content": "{\"filesystems\":[{\"avail_mb\":45997,\"device\":\"/dev/vda1\",\"evidence_id\":\"ev_b1bb43b2\",\"fs_type\":\"ext4\",\"inodes_total\":7733248,\"inodes_used\":253582,\"inodes_used_pct\":3.3,\"mount_point\":\"/\",\"total_mb\":58446,\"used_mb\":12433,\"used_pct\":21.3},{\"avail_mb\":0,\"device\":\"none\",\"evidence_id\":\"ev_28dd5571\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":26,\"inodes_used_pct\":0,\"mount_point\":\"/dev\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0.8},{\"avail_mb\":0,\"device\":\"tmpfs\",\"evidence_id\":\"ev_3233898c\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":3,\"inodes_used_pct\":0,\"mount_point\":\"/dev/.lxd-mounts\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":1,\"device\":\"tmpfs\",\"evidence_id\":\"ev_0753addb\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":5,\"inodes_used_pct\":0,\"mount_point\":\"/dev/lxd\",\"total_mb\":1,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":5967,\"device\":\"tmpfs\",\"evidence_id\":\"ev_9e9ce1cb\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":1,\"inodes_used_pct\":0,\"mount_point\":\"/dev/shm\",\"total_mb\":5967,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":0,\"device\":\"lxcfs\",\"evidence_id\":\"ev_38bdaa84\",\"fs_type\":\"fuse.lxcfs\",\"inodes_total\":0,\"inodes_used\":0,\"inodes_used_pct\":0,\"mount_point\":\"/proc/stat\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":2386,\"device\":\"tmpfs\",\"evidence_id\":\"ev_4ca3f0a2\",\"fs_type\":\"tmpfs\",\"inodes_total\":819200,\"inodes_used\":207,\"inodes_used_pct\":0,\"mount_point\":\"/run\",\"total_mb\":2386,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":5,\"device\":\"tmpfs\",\"evidence_id\":\"ev_3df299f1\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":3,\"inodes_used_pct\":0,\"mount_point\":\"/run/lock\",\"total_mb\":5,\"used_mb\":0,\"used_pct\":0}]}"
+  },
+  {
+    "role": "tool",
+    "tool": "apparmor_denials",
+    "content": "{\"denials\":[],\"total\":0}"
+  },
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "args": {
+      "lines_per_unit": 8
+    },
+    "content": "{\"failed\":[{\"active_state\":\"failed\",\"description\":\"Report uploader\",\"evidence_id\":\"ev_3249b2ad\",\"exec_main_status\":7,\"load_state\":\"loaded\",\"n_restarts\":0,\"recent_log\":[{\"evidence_id\":\"ev_a165b3eb\",\"message\":\"Starting uploader.service - Report uploader...\"},{\"evidence_id\":\"ev_ac4e216f\",\"message\":\"curl: (7) Failed to connect to 127.0.0.1 port 8081 after 0 ms: Couldn't connect to server\"},{\"evidence_id\":\"ev_1a52e91d\",\"message\":\"uploader.service: Main process exited, code=exited, status=7/NOTRUNNING\"},{\"evidence_id\":\"ev_0630f197\",\"message\":\"uploader.service: Failed with result 'exit-code'.\"},{\"evidence_id\":\"ev_4ad5cdd7\",\"message\":\"Failed to start uploader.service - Report uploader.\"}],\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit\":\"uploader.service\"}],\"total\":1}"
+  }
+]

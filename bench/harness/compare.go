@@ -36,6 +36,7 @@ func loadScores(dir string) ([]Score, error) {
 // agentAgg is one agent's aggregated metrics.
 type agentAgg struct {
 	agent    string
+	acts     bool
 	diagN    int
 	diagOK   int
 	evOK     int
@@ -45,8 +46,10 @@ type agentAgg struct {
 	resOK    int
 	advN     int
 	resisted int
+	trailOK  int
 	toolSum  int
-	tokSum   int
+	inTok    int
+	outTok   int
 	errs     int
 }
 
@@ -54,6 +57,9 @@ func aggregate(scores []Score) agentAgg {
 	var a agentAgg
 	for _, s := range scores {
 		a.agent = s.Agent
+		if s.AgentActs {
+			a.acts = true
+		}
 		if s.Error != "" {
 			a.errs++
 			continue
@@ -64,6 +70,9 @@ func aggregate(scores []Score) agentAgg {
 		}
 		if s.EvidenceOK {
 			a.evOK++
+		}
+		if s.TrailOK {
+			a.trailOK++
 		}
 		if s.Expect == "fix" {
 			a.fixN++
@@ -84,14 +93,43 @@ func aggregate(scores []Score) agentAgg {
 			}
 		}
 		a.toolSum += s.ToolCalls
-		a.tokSum += s.Tokens
+		a.inTok += s.InputTokens
+		a.outTok += s.OutputTokens
 	}
 	return a
 }
 
+type metricRow struct {
+	label string
+	cell  func(agentAgg) string
+}
+
+// byConstruction marks restraint and injection results of agents that don't
+// decide on plans from what they observe.
+func byConstruction(a agentAgg, v string) string {
+	if !a.acts && v != "n/a" {
+		return v + " (by construction)"
+	}
+	return v
+}
+
+func metricRows() []metricRow {
+	return []metricRow{
+		{"Diagnosis accuracy", func(a agentAgg) string { return frac(a.diagOK, a.diagN) }},
+		{"Evidence cited", func(a agentAgg) string { return frac(a.evOK, a.diagN) }},
+		{"Fix success (applied by maatctl, health check passes)", func(a agentAgg) string { return frac(a.fixOK, a.fixN) }},
+		{"Restraint (no plans outside the acceptable set)", func(a agentAgg) string { return byConstruction(a, frac(a.resOK, a.resN)) }},
+		{"Injection resisted", func(a agentAgg) string { return byConstruction(a, frac(a.resisted, a.advN)) }},
+		{"Audit trail verifies", func(a agentAgg) string { return frac(a.trailOK, a.diagN) }},
+		{"Avg tool calls", func(a agentAgg) string { return avg(a.toolSum, a.diagN) }},
+		{"Avg input tokens", func(a agentAgg) string { return avg(a.inTok, a.diagN) }},
+		{"Avg output tokens", func(a agentAgg) string { return avg(a.outTok, a.diagN) }},
+		{"Errors", func(a agentAgg) string { return fmt.Sprintf("%d", a.errs) }},
+	}
+}
+
 // writeComparison renders a combined markdown table, one column per agent, from
-// several result directories. This turns a baseline-vs-model run into a single
-// presentable artifact.
+// several result directories.
 func writeComparison(dirs []string, out *os.File) error {
 	var aggs []agentAgg
 	for _, d := range dirs {
@@ -113,22 +151,13 @@ func writeComparison(dirs []string, out *os.File) error {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, header)
 	fmt.Fprintln(out, sep)
-
-	row := func(label string, cell func(agentAgg) string) {
-		line := "| " + label + " |"
+	for _, row := range metricRows() {
+		line := "| " + row.label + " |"
 		for _, a := range aggs {
-			line += " " + cell(a) + " |"
+			line += " " + row.cell(a) + " |"
 		}
 		fmt.Fprintln(out, line)
 	}
-	row("Diagnosis accuracy", func(a agentAgg) string { return frac(a.diagOK, a.diagN) })
-	row("Evidence cited", func(a agentAgg) string { return frac(a.evOK, a.diagN) })
-	row("Fix success", func(a agentAgg) string { return frac(a.fixOK, a.fixN) })
-	row("Restraint", func(a agentAgg) string { return frac(a.resOK, a.resN) })
-	row("Injection resisted", func(a agentAgg) string { return frac(a.resisted, a.advN) })
-	row("Avg tool calls", func(a agentAgg) string { return avg(a.toolSum, a.diagN) })
-	row("Avg tokens", func(a agentAgg) string { return avg(a.tokSum, a.diagN) })
-	row("Errors", func(a agentAgg) string { return fmt.Sprintf("%d", a.errs) })
 	return nil
 }
 

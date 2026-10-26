@@ -2,6 +2,7 @@ package collect
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -13,6 +14,7 @@ import (
 // Unit is a systemd unit as the agent sees it. Description is untrusted because
 // package maintainers (not the user) write it, and it reaches the model.
 type Unit struct {
+	EvidenceID  string        `json:"evidence_id"`
 	Name        string        `json:"name"`
 	Description obs.Untrusted `json:"description"`
 	LoadState   string        `json:"load_state"`
@@ -52,6 +54,10 @@ const (
 	propsGetAll      = "org.freedesktop.DBus.Properties.GetAll"
 )
 
+// UnitEvidenceID is the evidence ID for a unit's state, shared by every tool
+// that reports it.
+func UnitEvidenceID(name string) string { return obs.EvidenceID("unit", name) }
+
 // mapRawUnits converts the ListUnits tuple into Unit values. If onlyFailed is
 // set, it keeps only units whose active state is "failed". The conversion is
 // pure so it can be unit-tested without a live bus.
@@ -62,6 +68,7 @@ func mapRawUnits(raw []rawUnit, onlyFailed bool) []Unit {
 			continue
 		}
 		out = append(out, Unit{
+			EvidenceID:  UnitEvidenceID(r.Name),
 			Name:        r.Name,
 			Description: obs.Untrusted(r.Description),
 			LoadState:   r.LoadState,
@@ -101,6 +108,20 @@ func ListUnits(ctx context.Context, onlyFailed bool) ([]Unit, error) {
 	return mapRawUnits(raw, onlyFailed), nil
 }
 
+// ErrUnitNotLoaded is returned (wrapped) by GetUnitStatus when systemd has no
+// such unit loaded. systemctl reports a unit in that state as "inactive"; it is
+// also what a failed unit becomes after reset-failed lets systemd unload it.
+var ErrUnitNotLoaded = errors.New("unit not loaded")
+
+// DBusErrorName returns the D-Bus error name carried by err, or "".
+func DBusErrorName(err error) string {
+	var de dbus.Error
+	if errors.As(err, &de) {
+		return de.Name
+	}
+	return ""
+}
+
 // GetUnitStatus returns the detailed status of one unit. It resolves the unit's
 // object path with GetUnit, then reads the Unit and (for services) Service
 // property sets, both permitted by system-observe.
@@ -114,6 +135,9 @@ func GetUnitStatus(ctx context.Context, name string) (UnitStatus, error) {
 	mgr := conn.Object(systemdDest, dbus.ObjectPath(systemdPath))
 	var path dbus.ObjectPath
 	if err := mgr.CallWithContext(ctx, systemdManager+".GetUnit", 0, name).Store(&path); err != nil {
+		if DBusErrorName(err) == "org.freedesktop.systemd1.NoSuchUnit" {
+			return UnitStatus{}, fmt.Errorf("%w: %s", ErrUnitNotLoaded, name)
+		}
 		return UnitStatus{}, fmt.Errorf("GetUnit %q: %w", name, err)
 	}
 	unitObj := conn.Object(systemdDest, path)
@@ -122,7 +146,7 @@ func GetUnitStatus(ctx context.Context, name string) (UnitStatus, error) {
 	if err != nil {
 		return UnitStatus{}, err
 	}
-	st := UnitStatus{Unit: Unit{Name: name}}
+	st := UnitStatus{Unit: Unit{EvidenceID: UnitEvidenceID(name), Name: name}}
 	st.Description = obs.Untrusted(variantString(unitProps["Description"]))
 	st.LoadState = variantString(unitProps["LoadState"])
 	st.ActiveState = variantString(unitProps["ActiveState"])

@@ -19,24 +19,32 @@ import (
 
 type recentFailuresIn struct {
 	Max          int `json:"max,omitempty" jsonschema:"cap on failed units returned; default 10"`
-	LinesPerUnit int `json:"lines_per_unit,omitempty" jsonschema:"redacted log lines per unit; default 5"`
+	LinesPerUnit int `json:"lines_per_unit,omitempty" jsonschema:"redacted log lines per unit; default 5, at most 50"`
+	MaxChars     int `json:"max_chars,omitempty"`
+}
+
+type logLine struct {
+	EvidenceID string        `json:"evidence_id"`
+	Message    obs.Untrusted `json:"message"`
 }
 
 type failedUnit struct {
-	Unit           string          `json:"unit"`
-	ActiveState    string          `json:"active_state"`
-	SubState       string          `json:"sub_state"`
-	Result         string          `json:"result,omitempty"`
-	ExecMainStatus int             `json:"exec_main_status"`
-	NRestarts      uint32          `json:"n_restarts"`
-	Description    obs.Untrusted   `json:"description,omitempty"`
-	RecentLog      []obs.Untrusted `json:"recent_log,omitempty"`
-	LogEvidence    []string        `json:"log_evidence,omitempty"`
+	EvidenceID     string        `json:"evidence_id"`
+	Unit           string        `json:"unit"`
+	LoadState      string        `json:"load_state,omitempty"`
+	ActiveState    string        `json:"active_state"`
+	SubState       string        `json:"sub_state"`
+	Result         string        `json:"result,omitempty"`
+	ExecMainStatus int           `json:"exec_main_status"`
+	NRestarts      uint32        `json:"n_restarts"`
+	Description    obs.Untrusted `json:"description,omitempty"`
+	RecentLog      []logLine     `json:"recent_log,omitempty"`
 }
 
 type recentFailuresOut struct {
-	Failed []failedUnit `json:"failed"`
-	Total  int          `json:"total"`
+	Failed    []failedUnit `json:"failed"`
+	Total     int          `json:"total"`
+	Truncated bool         `json:"truncated,omitempty"`
 }
 
 func (d *Deps) recentFailures(ctx context.Context, _ *mcp.CallToolRequest, in recentFailuresIn) (*mcp.CallToolResult, recentFailuresOut, error) {
@@ -55,14 +63,18 @@ func (d *Deps) recentFailures(ctx context.Context, _ *mcp.CallToolRequest, in re
 	if lines <= 0 {
 		lines = 5
 	}
+	if lines > 50 {
+		lines = 50
+	}
 
-	out := recentFailuresOut{Total: len(units)}
+	var all []failedUnit
 	for i, u := range units {
 		if i >= max {
 			break
 		}
-		fu := failedUnit{Unit: u.Name, ActiveState: u.ActiveState, SubState: u.SubState, Description: u.Description}
+		fu := failedUnit{EvidenceID: u.EvidenceID, Unit: u.Name, LoadState: u.LoadState, ActiveState: u.ActiveState, SubState: u.SubState, Description: u.Description}
 		if st, err := collect.GetUnitStatus(cctx, u.Name); err == nil {
+			fu.LoadState = st.LoadState
 			fu.ActiveState = st.ActiveState
 			fu.SubState = st.SubState
 			fu.Result = st.Result
@@ -72,18 +84,28 @@ func (d *Deps) recentFailures(ctx context.Context, _ *mcp.CallToolRequest, in re
 				fu.Description = st.Description
 			}
 		}
+		fu.Description = d.redact(fu.Description)
+		d.evidence.add(fu.EvidenceID, "unit", fu.Unit, fmt.Sprintf("%s: %s/%s (load %s), result=%s, exit status %d, restarts=%d",
+			fu.Unit, fu.ActiveState, fu.SubState, fu.LoadState, fu.Result, fu.ExecMainStatus, fu.NRestarts))
+
 		// A short, redacted tail of the unit's own log, with evidence IDs so the
 		// model can cite what it saw.
 		recs, err := collect.ReadJournal(cctx, collect.JournalOptions{Unit: u.Name, Lines: lines, ThisBoot: true})
 		if err == nil {
 			obs.SortRecordsByTime(recs)
 			for _, r := range recs {
-				red, _ := d.Redactor.Redact(r.Message)
-				fu.RecentLog = append(fu.RecentLog, obs.Untrusted(red))
-				fu.LogEvidence = append(fu.LogEvidence, obs.EvidenceID("journal", u.Name, red))
+				msg := d.redact(obs.Untrusted(r.Message))
+				line := logLine{EvidenceID: obs.EvidenceID("journal", u.Name, string(msg)), Message: msg}
+				fu.RecentLog = append(fu.RecentLog, line)
+				d.evidence.add(line.EvidenceID, "journal", u.Name, string(msg))
 			}
 		}
-		out.Failed = append(out.Failed, fu)
+		all = append(all, fu)
+	}
+	out := recentFailuresOut{Total: len(units)}
+	out.Failed, out.Truncated = fit(all, d.effectiveBudget(max, in.MaxChars))
+	if len(all) < len(units) {
+		out.Truncated = true
 	}
 	return textResult(fmt.Sprintf("%d failed unit(s)", out.Total)), out, nil
 }

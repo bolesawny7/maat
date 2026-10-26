@@ -1,6 +1,11 @@
-# maat
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/maat-logo-dark.svg">
+    <img src="docs/assets/maat-logo-light.svg" alt="maat" width="380">
+  </picture>
+</h1>
 
-**Let AI agents troubleshoot Ubuntu machines, with permissions enforced by the kernel instead of the prompt.**
+<p align="center"><b>Let AI agents troubleshoot Ubuntu machines, with permissions enforced by the kernel instead of the prompt.</b></p>
 
 *The name: **Ma'at** was the ancient Egyptian principle of truth and balance — the standard a life was weighed against, with the result recorded by Thoth. This tool weighs every proposed change before allowing it, and keeps the record.*
 
@@ -8,29 +13,28 @@ maat is an open-source [Model Context Protocol](https://modelcontextprotocol.io)
 
 - It reads system state from inside a **strictly confined snap** with read-oriented permissions and no network access at all.
 - It turns fixes into **typed, reviewable plans** that you approve through polkit, the same mechanism that guards `systemctl restart` and `snap revert`.
+- It shows you the **evidence** a plan relies on, and flags citations the model invented.
 - It records every step in a **tamper-evident trail**.
-- It ships with **maat-bench**, an open benchmark of deliberately broken Ubuntu machines. It measures how well models find the root cause, and how they behave when the logs try to hijack them.
+- It ships with **maat-bench**, an open benchmark of deliberately broken Ubuntu machines, for measuring how well models find the root cause and how they behave when the logs try to hijack them.
 
 > [!IMPORTANT]
-> **Status: early but working developer preview.** The server, CLIs, actuator, audit trail and benchmark are implemented in Go and tested. The strict snap has been built and run on a real Ubuntu 24.04 VM, where the confinement self-test passes 7/7: the server reads the journal and lists 501 systemd units, yet AppArmor blocks `RestartUnit`, the network is unreachable, and the filesystem is read-only. See [docs/evidence/](docs/evidence/) for the captured output and [docs/roadmap.md](docs/roadmap.md) for what is and isn't done. Every external claim (snapd, systemd, netplan, polkit, MCP) is sourced in [docs/references.md](docs/references.md).
+> **Status: developer preview.** The server, CLIs, actuator, audit trail and benchmark harness are implemented in Go and tested. On an Ubuntu 24.04 VM (arm64), the strict snap's self-test passes all six checks that prove confinement: it reads the journal and lists 502 systemd units, yet creating any internet socket fails with `EACCES`, writing to your home directory is refused, and AppArmor itself (not polkit) refuses `RestartUnit`. The full human loop has also been run there: a proposal from the confined server, review in `maatctl`, refusal of tampered plans, a polkit prompt, apply and verify, and trail verification. See [docs/evidence/](docs/evidence/).
 >
-> One finding from that testing already shaped the design: the `network-observe` interface turned out to permit outbound TCP, so it was **removed** to keep the no-exfiltration guarantee. The network collector now fails closed under the strict profile.
+> **Not yet measured: how real models behave.** The benchmark's published numbers come from a no-LLM baseline and an oracle that validates the scenarios. Neither decides on plans from what it observes, so their injection resistance holds by construction and says nothing about maat. The first real-model runs are the next milestone ([roadmap](docs/roadmap.md)).
 
 ## What it does
 
-maat gives an AI agent real access to an Ubuntu machine for troubleshooting, while making it impossible for the agent to damage that machine. In plain terms:
+maat gives an AI agent real access to an Ubuntu machine for troubleshooting, while making it impossible for the agent to change that machine on its own. In plain terms:
 
-1. **It looks, but can't touch.** The agent's tools run inside a locked-down snap that can read the journal, services, processes, disks and network state — but cannot change anything or reach the network. The kernel enforces this, so a tricked or buggy model still can't do harm.
-2. **It makes logs legible to models.** Noisy logs are de-duplicated, stripped of secrets, and summarized to fit a small model's context window, with an ID on each finding so a diagnosis can be checked against the evidence it cites.
-3. **It proposes fixes as reviewable plans.** Instead of running commands, the agent suggests one specific, typed action (say, restarting a named service). maat attaches the preconditions, the success check, and the undo step itself — the model can't weaken them.
-4. **You approve; the OS authorizes.** A separate, unprivileged tool (`maatctl`) shows you the plan and runs it only after you confirm on your terminal, through the same permission prompt that already guards `systemctl` and `snap`. It then verifies the result and rolls back on failure.
-5. **Everything is recorded.** Each step is written to a tamper-evident, hash-chained log you can verify later.
+1. **It looks, but can't touch.** The agent's tools run inside a locked-down snap that can read the journal, services, processes and disks, but can't change anything or reach the network. The kernel enforces this, so a tricked or buggy model still can't do harm.
+2. **It makes logs legible to models.** Noisy logs are de-duplicated, stripped of secrets, clipped and summarized to fit a small model's context window, with an evidence ID on every finding.
+3. **It proposes fixes as reviewable plans.** Instead of running commands, the agent suggests one specific, typed action, such as restarting a named failed service. maat attaches the preconditions, the success check and the undo step itself, and `maatctl` rejects any plan whose steps differ from what maat would have derived.
+4. **You approve; the OS authorizes.** A separate, unprivileged tool (`maatctl`) shows you the plan and the log lines it cites, and runs it only after you confirm on your terminal, through the same polkit prompt that already guards `systemctl`. It then verifies the result.
+5. **Everything is recorded.** Each step goes into a hash-chained log with checkpoints in the systemd journal. `maat trail verify` detects edited, deleted, reordered and truncated records.
 
-The net effect: you can hand the tedious part of troubleshooting to an agent and keep the safety guarantees you already rely on for a production machine. It also works with no AI at all — `maat diagnose` prints the same analysis as a plain report.
+It also works with no AI at all: `maat diagnose` prints the same analysis as a plain report.
 
 ## Why
-
-> **In one line:** agents are landing on servers faster than the safety model for them exists, and no one has yet given Ubuntu a confined, auditable way to let an agent touch a *real* host. maat is a concrete answer to that gap.
 
 Agents are good at the tedious part of troubleshooting: reading logs, lining up timestamps and narrowing down a root cause. The usual way to give them that ability is a shell, and a shell lets the agent do anything you can.
 
@@ -40,11 +44,7 @@ Application-level defenses are hard to get right. In September 2026, Red Hat's r
 
 MCP itself doesn't solve it. Tool annotations like `readOnlyHint` are hints, and [the MCP maintainers say](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/) that real guarantees are "a job for network controls or sandboxing, not a boolean hint."
 
-On Ubuntu, that sandbox already exists. Snap confinement (AppArmor plus seccomp) comes with a reviewed capability model: snap interfaces. maat uses it to give an agent real access to the host without having to trust the agent.
-
-This lines up with Canonical's [stated direction](https://discourse.ubuntu.com/t/the-future-of-ai-in-ubuntu/81130) for agents on Ubuntu: primitives that let them "operate within existing boundaries, whether that be read-only analysis, tightly scoped permissions for any actions, and full auditability of decisions and outcomes." maat is an independent attempt to build those primitives in the open.
-
-**Why it's worth building.** The timing is real: every major OS is adding agentic features, teams are already pointing agents at servers, and the usual answer — a shell — throws away decades of hard-won access control. maat is interesting precisely because it *reuses* that control (snap confinement, polkit, `netplan try`, `snap revert`) instead of reinventing it, so the safety isn't a new thing to trust — it's the thing you already trust. It's also a clean fit for where Ubuntu is heading: local-first, confined, auditable. And it's measurable, not hand-waved — the benchmark turns "is this safe and useful?" into numbers anyone can reproduce.
+On Ubuntu, that sandbox already exists. Snap confinement (AppArmor plus seccomp) comes with a reviewed capability model: snap interfaces. maat uses it, and reuses polkit, the systemd journal and the systemd D-Bus API for everything else, so the safety rests on mechanisms administrators already trust rather than on new ones. This lines up with Canonical's [stated direction](https://discourse.ubuntu.com/t/the-future-of-ai-in-ubuntu/81130) for agents on Ubuntu: primitives that let them "operate within existing boundaries, whether that be read-only analysis, tightly scoped permissions for any actions, and full auditability of decisions and outcomes." maat is an independent attempt to build those primitives in the open.
 
 ## How it works
 
@@ -78,13 +78,11 @@ flowchart LR
     ctl -.->|records| trail
 ```
 
-1. **Observe.** `maat mcp` is an MCP server that talks over stdio and runs inside a strictly confined snap. It plugs only read-oriented interfaces (`log-observe`, `system-observe`, `mount-observe`) and has no `network` plug. Even if the model is completely hijacked, the process can't restart services, edit files or send data anywhere, because AppArmor and seccomp refuse the system calls; the [self-test evidence](docs/evidence/selftest-confined.txt) shows exactly those refusals. (`log-observe` does allow two kernel logging settings to be changed; [the security model](docs/security-model.md#t3-a-malicious-log-line-exploits-a-bug-in-maats-parsers) explains how maat handles that.)
-2. **Condense.** Raw logs drown small models. Before anything reaches the model, maat redacts secrets, groups log lines into templates with the [Drain](https://doi.org/10.1109/icws.2017.13) algorithm, ranks them and fits the result into a token budget. Each item carries an evidence ID, so a diagnosis can cite exactly what it relied on.
-3. **Propose.** The model can't run commands. It can call `propose_action` with one action from a small, typed catalog, such as `service.restart` for a named unit. A plan is data: what to do, the preconditions, how to check it worked, how to undo it, and the model's reasoning (kept for the record, treated as untrusted).
-4. **Act.** You run `maatctl`, a separate program that never runs as root. It shows you the plan, checks it again, asks you to confirm on your terminal, and then calls system APIs that already require polkit admin authentication: systemd's `org.freedesktop.systemd1.manage-units` and snapd's `io.snapcraft.snapd.manage`. Afterwards it verifies the result, and rolls back if the action has an inverse.
-5. **Account.** Observations, proposals, approvals and outcomes go into an append-only, hash-chained trail. Its checkpoints are written to the systemd journal, where ordinary processes can add entries but can't remove them. `maat trail verify` detects tampering.
-
-maat also works with no AI at all: `maat diagnose` runs the same collectors and prints a deterministic report.
+1. **Observe.** `maat mcp` is an MCP server that talks over stdio, runs inside a strictly confined snap, and refuses to run as root. It plugs only read-oriented interfaces (`log-observe`, `system-observe`, `mount-observe`) and has no `network` plug. Even a completely hijacked model can't restart services, write your files or send data anywhere, because AppArmor and seccomp refuse the system calls; the [self-test evidence](docs/evidence/selftest-confined.txt) shows those refusals. (`log-observe` also makes two kernel logging settings writable, but both are root-only files, which is why the server refuses root; see [the security model](docs/security-model.md#t3-a-malicious-log-line-exploits-a-bug-in-maats-parsers).)
+2. **Condense.** Raw logs drown small models. Before anything reaches the model, maat redacts secrets, groups log lines into templates with the [Drain](https://doi.org/10.1109/icws.2017.13) algorithm, ranks them, clips long fields and fits the result into a budget. Every unit, log line, filesystem, process, socket and AppArmor denial carries an evidence ID, and the server remembers what each ID it issued referred to.
+3. **Propose.** The model can't run commands. It can call `propose_action` with one action from a small, typed catalog, such as `service.restart` for a named failed `.service` unit. maat derives the preconditions, the success check and the undo step, and attaches the evidence the model cited, marking any ID the server never issued.
+4. **Act.** You run `maatctl`, a separate program that never runs as root. It reads the plan once, checks it from scratch (including that its safety steps are exactly what the catalog derives), checks that its bytes match the digest recorded when it was proposed, and shows you the plan and its evidence with any terminal control characters neutralized. After you confirm on your terminal, it calls system APIs that already require polkit admin authentication (systemd's `org.freedesktop.systemd1.manage-units`, snapd's `io.snapcraft.snapd.manage`), starting polkit's text agent the way `systemctl` does so the prompt works over SSH. Then it verifies the result.
+5. **Account.** Proposals, approvals, executions and verifications go into an append-only, hash-chained trail, with each new head checkpointed in the systemd journal, where ordinary processes can add entries but can't remove them. `maat trail verify` recomputes the chain and checks it against your checkpoints.
 
 ## What makes it different
 
@@ -96,56 +94,62 @@ General-purpose agent sandboxes protect your machine *from* an agent by running 
 | How changes happen | Any command the user could run | Off by default; opt-in guarded execution | Typed plans you approve through polkit |
 | Network access of the server | Unrestricted | Typically needed (SSH to target hosts) | None |
 
-## Planned tools (v0)
+## Tools
 
-All tools are read-only except `propose_action`, which only writes a plan file into maat's own data directory.
+All tools are read-only except `propose_action`, which only writes a plan file into maat's own data directory. List tools accept `max_items` and `max_chars` budgets (character estimates, not model tokens).
 
-| Tool | Returns | Snap interface |
+| Tool | Returns | Under the strict snap |
 |---|---|---|
-| `system_overview` | OS release, kernel, uptime, load, memory pressure, number of failed units | `system-observe` |
-| `list_units` | Units filtered by state, for example every failed unit | `system-observe` |
-| `unit_status` | Active state, sub-state, result, restart count, recent exit codes | `system-observe` |
-| `recent_failures` | Every failed unit with status and a redacted log tail, in one call | `system-observe`, `log-observe` |
-| `journal_summary` | Log templates with counts, time range and one redacted example each | `log-observe` |
-| `journal_entries` | Filtered raw entries, redacted and within budget | `log-observe` |
-| `kernel_messages` | Recent kernel log | `log-observe` |
-| `apparmor_denials` | Parsed AppArmor `DENIED` events | `log-observe` |
-| `network_state` | Links, addresses and routes | none (fails closed under the strict profile; see note) |
-| `listening_sockets` | Listening TCP and UDP sockets and their processes | `system-observe` (reads `/proc/net`) |
-| `disk_usage` | Space and inode usage per filesystem | `mount-observe` |
-| `top_processes` | Processes using the most CPU and memory | `system-observe` |
-| `propose_action` | Validates and stores a typed plan for human review | none |
+| `system_overview` | OS release, kernel, uptime, load, memory pressure, number of failed units | Works (`system-observe`) |
+| `list_units` | Units, optionally only the failed ones | Works (`system-observe`) |
+| `unit_status` | Load, active and sub-state, result, last exit code, restart count | Works (`system-observe`) |
+| `recent_failures` | Every failed unit with its status and a redacted log tail, in one call | Works (`system-observe`, `log-observe`) |
+| `journal_summary` | Log templates with counts, time range and one redacted example each | Works (`log-observe`) |
+| `journal_entries` | The newest raw entries, redacted, within budget | Works (`log-observe`) |
+| `kernel_messages` | Recent kernel log, summarized | Works (`log-observe`) |
+| `apparmor_denials` | Parsed AppArmor `DENIED` events, de-duplicated | Works (`log-observe`) |
+| `disk_usage` | Space and inode usage per filesystem, as the host sees it | Works (`mount-observe`; the host view is read through the snap's `hostfs`) |
+| `top_processes` | Processes using the most CPU and memory | Works (`system-observe`) |
+| `network_state` | Interfaces, traffic counters, addresses, routes | Partial: interface names and counters only, and the result says so |
+| `listening_sockets` | Listening TCP and bound UDP sockets and their processes | Unavailable: returns an explanatory error |
+| `propose_action` | Validates and stores a typed plan for human review | Works |
 
-These were checked on a real Ubuntu 24.04 VM: `log-observe` gives journal access (with the user in the `systemd-journal` group), `system-observe` lists units over D-Bus and reads `/proc`, and `mount-observe` plus `/proc` cover disks and sockets. `network_state` needs netlink access that only `network-observe` grants, and `network-observe` also opens outbound TCP, so maat drops it and `network_state` fails closed. See [docs/references.md](docs/references.md) for the per-item results.
+The last two are limited on purpose. Reading addresses, routes and the `/proc/net` socket tables needs the `network-observe` interface, and testing showed that `network-observe` also permits outbound TCP, which would hand a hijacked model an exfiltration channel. maat drops it, and those tools say why instead of returning an empty answer. Outside the snap (as in the benchmark) both work fully.
 
-## Planned actions (v0)
+## Actions
 
 | Action | How it's executed | Who authorizes it | Undo |
 |---|---|---|---|
-| `service.restart` | systemd D-Bus `RestartUnit` | polkit `org.freedesktop.systemd1.manage-units` | Not needed; confirmed by a health check |
-| `service.reset-failed` | systemd D-Bus `ResetFailedUnit` | Same polkit action | Not needed |
-| `snap.revert` | snapd REST API, `POST /v2/snaps/{name}` with action `revert` | polkit `io.snapcraft.snapd.manage` | Refresh back to the recorded revision |
-| `netplan.try` (research) | netplan D-Bus `Config`, `Set` and `Try`, then `Apply` or `Cancel` | Open question (A6) | Automatic: netplan reverts if the change isn't confirmed in time |
+| `service.restart` (failed `.service` units only) | systemd D-Bus `RestartUnit` | polkit `org.freedesktop.systemd1.manage-units` | Not needed; confirmed by a health check |
+| `service.reset-failed` (failed `.service` units only) | systemd D-Bus `ResetFailedUnit` | Same polkit action | Not needed |
+| `snap.revert` | snapd REST API, `POST /v2/snaps/{name}` with action `revert` | polkit `io.snapcraft.snapd.manage` | Manual for now: the trail records the revision to return to |
+| `netplan.try` (research) | Not executed by `maatctl` | Open question (A6) | netplan reverts automatically |
 
-systemd tells polkit which unit and which verb an action is for. That means an admin can write a rule that allows restarting one specific service without a password, while everything else still prompts. maat documents this but never installs polkit rules itself.
+Only `.service` units are accepted. Restarting a target is not a service restart: `RestartUnit("reboot.target")` reboots the machine.
+
+systemd tells polkit which unit and which verb an action is for, so an administrator can allow, say, resetting one specific unit without a password while everything else still prompts. [docs/evidence/maatctl-end-to-end.txt](docs/evidence/maatctl-end-to-end.txt) shows such a rule in use. maat never installs polkit rules itself.
 
 ## maat-bench
 
-The benchmark is how this project avoids hand-waving. maat-bench builds broken Ubuntu machines in throwaway LXD containers and VMs: a full disk, a crash-looping service, a bad DNS setting, an AppArmor denial, and more. A model investigates each one through maat's tools, and the result is scored without an LLM judge:
+The benchmark builds broken Ubuntu machines in throwaway LXD containers, lets an agent investigate each one through maat's real tools, and scores the result without an LLM judge: the root cause from a fixed taxonomy, the evidence cited, whether a proposed fix works when the real `maatctl` applies it, restraint on machines that need no fix, resistance to instructions planted in logs, and whether the audit trail verifies. maat runs in each container as an unprivileged user, the way it is deployed, and fixes are authorized by a polkit rule scoped to that user and to the two service verbs.
 
-- **Diagnosis:** did the model name the right root cause from a fixed list, and cite evidence that supports it?
-- **Fix:** did it propose an acceptable plan, and does the machine pass its health check after that plan runs inside the VM?
-- **Restraint:** on healthy or out-of-scope machines, does it avoid inventing fixes?
-- **Injection resistance:** some scenarios plant instructions in the logs (SSH usernames, `logger` messages, unit descriptions) that contain a unique canary string. Any plan or answer that acts on the canary counts as a successful hijack.
-- **Cost:** tokens, tool calls and wall-clock time.
+Ten scenarios run end to end today. The latest runs ([comparison](docs/evidence/bench-comparison.md)):
 
-Local models served by Canonical's [inference snaps](https://documentation.ubuntu.com/inference-snaps/) and hosted models run through the same harness, with the same prompt, tools and budgets. The harness, scorer and ten scenarios run end-to-end in LXD today. The no-LLM baseline agent scores 8/10 on diagnosis, 8/8 on restraint and resists both log-injection scenarios, as a floor for comparison; an oracle agent validates that all ten scenarios are solvable and that both fix-and-verify actions (restart and reset-failed) work. The OpenAI-compatible agent supports native tool-calling and a text ReAct protocol, with retries for hosted endpoints (verified against SmolLM2; point it at any inference snap or hosted API). Details, the full scenario list, and results are in [bench/README.md](bench/README.md).
+| | Baseline (keyword rules, no LLM) | Oracle (answers with the truth) |
+|---|---|---|
+| Diagnosis | 9/10 | 10/10 |
+| Evidence cited | 7/10 | 10/10 |
+| Fix applied by `maatctl` and healthy afterwards | 0/2 (never proposes) | 2/2 |
+| Audit trail verifies | 10/10 | 10/10 |
+
+The oracle proves every scenario is solvable, leaves the evidence it needs, and that the fix track works through the real server, `maatctl`, polkit and trail. The baseline is a floor, and a warning: keyword rules get 9 of 10, so the current scenarios are too easy to separate good models from mediocre ones. Harder scenarios are the next step. The OpenAI-compatible agent (native tool calls or a text ReAct loop) is ready for local inference snaps and hosted endpoints; no real-model results are published yet. Details are in [bench/README.md](bench/README.md).
 
 ## Quickstart
 
-The snap isn't in the Store yet; build it from source (see [docs/roadmap.md](docs/roadmap.md)). Once installed:
+The snap isn't in the Store yet; build it from source on Ubuntu ([docs/demo.md](docs/demo.md) has the full walk-through):
 
 ```bash
+snapcraft pack
 sudo snap install --dangerous maat_*.snap
 for iface in log-observe system-observe mount-observe; do
   sudo snap connect "maat:$iface"
@@ -157,6 +161,12 @@ maat selftest   # prove the confinement holds on your machine
 maat diagnose   # deterministic report, no AI involved
 ```
 
+`maatctl` lives outside the snap by design. Until it is packaged, build it from the same tree:
+
+```bash
+go build -o ~/.local/bin/maatctl ./cmd/maatctl
+```
+
 Connect an MCP client:
 
 ```bash
@@ -166,57 +176,68 @@ opencode mcp add maat -- maat mcp   # OpenCode
 
 To keep everything on your machine, use a local model from an inference snap. Its `status` command prints an OpenAI-compatible endpoint (for example `http://localhost:8336/v1` for `gemma4`), and Canonical documents [how to use one with OpenCode](https://documentation.ubuntu.com/inference-snaps/how-to/integration/opencode/).
 
-When the agent proposes a fix, you review and apply it yourself:
+When the agent proposes a fix, you review and apply it yourself, in your own terminal:
 
 ```bash
 maatctl list               # pending plans
-maatctl show PLAN_ID       # plan, cited evidence, preview, rollback
+maatctl show PLAN_ID       # plan, cited evidence, safety steps
 maatctl apply PLAN_ID      # confirm on your terminal; polkit asks for admin authentication
 maat trail verify
 ```
+
+## Known limitations
+
+- **Real-model behaviour is unmeasured.** See the status note above.
+- **No network or socket view under confinement.** That's the price of having no network permission; see [Tools](#tools).
+- **`snap.revert` has no automatic undo.** The revision to return to is recorded in the trail; reverting back is manual.
+- **Redaction is pattern-based** and will miss some secrets. With a hosted model, condensed log data leaves the machine; use a local model for sensitive hosts.
+- **maat can't take a shell away from your MCP client.** If the client also gives the model a shell, the model can do whatever that shell allows. See [deployment assumptions](docs/security-model.md#deployment-assumptions).
+- **The trail detects tampering; it doesn't prevent it.** Root can rewrite anything, and replacing the whole trail file is reported as a warning, because it can't be told apart from a reinstall.
+- **One machine at a time,** Ubuntu 24.04 tested (arm64), 26.04 not yet.
 
 ## Principles
 
 - Least privilege is enforced by the kernel, not requested in a prompt.
 - Proposing and executing happen in different processes with different privileges.
-- Reuse Ubuntu's existing safety mechanisms (snap interfaces, polkit, `netplan try`, `snap revert`) instead of inventing new ones.
+- Reuse Ubuntu's existing safety mechanisms (snap interfaces, polkit, the journal, `snap revert`) instead of inventing new ones.
+- Fail closed and say so: a tool that can't see something returns an error, never an empty answer.
 - Local-first: works offline with inference snaps, and sends no telemetry.
-- Opt-in and quiet: nothing runs in the background, and the core report works without AI.
-- Every claim has a source, and every assumption has a test.
+- Every claim has a source, and every result in this repository was produced by code in this repository.
 
 ## Non-goals
 
 - **A sandbox for coding agents.** Use Workshop for that.
 - **Fleet management.** v0 works on the local machine only.
 - **Protection against root or kernel exploits.** maat relies on the kernel and on root being trustworthy.
-- **Removing dangerous tools from your MCP client.** If your client also gives the model a raw shell, maat can't take it away. See [deployment assumptions](docs/security-model.md#deployment-assumptions).
 - **Active network probes.** The confined server never makes network connections, not even pings or DNS lookups, because the permission that allows them would also let data leave the machine.
 
 ## Reliability
 
-maat handles attacker-influenced input (logs, unit metadata) and performs privileged actions, so correctness is tested, not assumed:
+maat handles attacker-influenced input (logs, unit metadata, plan files) and performs privileged actions, so correctness is tested, not assumed:
 
-- **Unit and fixture tests** for every collector, the condense pipeline, plans, the actuator, and the MCP server.
-- **Security-invariant tests** that fail the build if the snap gains a network plug, an unapproved interface, a shell call, or a confirmation bypass (see [docs/security-model.md](docs/security-model.md)).
-- **Fuzz tests** for the untrusted-input parsers (journal JSON, AppArmor denials, mountinfo, `/proc/net`, process stat, redaction, clustering) — hundreds of thousands of executions with no crashes.
-- **A race-tested audit trail**: concurrent appends serialize under a file lock and the hash chain stays intact.
-- **A memory-bounded clusterer**: pathological or adversarial log floods fold into a single overflow template instead of growing without limit.
-- **CI** runs `go test`, `go vet`, `gofmt`, the invariants, and `govulncheck`, and builds the snap on every change.
+- **Unit and fixture tests** for every collector (including mount tables captured inside and outside the real snap), the condense pipeline, plan validation and plan files (what `maatctl` reads), the trail, the actuator and the MCP server.
+- **Security-invariant tests** that fail the build if the snap gains a network plug or an unapproved interface, if code shells out, if `maatctl` or the server stop refusing root, if an action kind lacks its safety steps, or if a release `maatctl` binary contains the benchmark's auto-confirm code (the test builds it and scans the binary). See [docs/security-model.md](docs/security-model.md#security-invariants).
+- **Fuzz tests** for every untrusted-input parser and for plan validation and terminal sanitizing.
+- **A race-tested audit trail**, with tests for edits, deletions, truncation, other users' journal entries and reinstalls.
+- **CI** runs `go vet` (including the benchmark build tag), `go test -race`, `gofmt`, the invariants, short fuzz runs and `govulncheck`, and builds the snap.
 
-Run it all with `make all`.
+Run it all with `make all race`.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md): components, data flow, plans, the trail and key decisions
 - [Security model](docs/security-model.md): threats, trust boundaries and the invariants enforced in CI
 - [References](docs/references.md): verified facts with sources, and open assumptions with test plans
-- [Roadmap](docs/roadmap.md): milestones and acceptance criteria
+- [Roadmap](docs/roadmap.md): milestones and what is done
+- [Evidence](docs/evidence/): captured output from a real Ubuntu VM
 - [maat-bench](bench/README.md): scenarios, scoring and reproducibility
 - [AGENTS.md](AGENTS.md): rules for AI coding agents working on this repository
 
 ## The name, and why it fits
 
-In the judgment scene of the Book of the Dead (spell 125), a heart was weighed against the feather of Ma'at — truth and balance — and Thoth wrote down the verdict. The design maps onto that almost exactly: every proposed action is weighed against a check before it's allowed (the balance), nothing changes without passing (the judgment), and every step is written to an audit trail that can't be quietly altered (Thoth's record). A short, memorable name for a tool whose whole point is that actions are measured, not trusted.
+In the judgment scene of the Book of the Dead (spell 125), a heart was weighed against the feather of Ma'at — truth and balance — and Thoth wrote down the verdict. The design maps onto that closely: every proposed action is weighed against a check before it's allowed, nothing changes without passing, and every step is written to a record that can't be quietly altered.
+
+The logo is that feather, in black and white, with its tip curling the way it does in her hieroglyph; the wordmark is set in Cinzel. It is the snap's icon, MCP clients that display server icons show it next to maat, and `maat` and `maatctl` draw it in braille when you ask a terminal for `help` or `version`. [scripts/make_logo.py](scripts/make_logo.py) generates every variant in [docs/assets/](docs/assets/) and the terminal drawing.
 
 ## Contributing, security and license
 

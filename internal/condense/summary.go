@@ -1,12 +1,32 @@
 package condense
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"time"
+	"unicode/utf8"
 
 	"github.com/bolesawny7/maat/internal/obs"
 )
+
+// MaxFieldBytes caps any single text field a model receives. journald accepts
+// lines of tens of kilobytes, and without a cap one such line would consume
+// the whole budget, or exceed it, since the first item is always kept.
+const MaxFieldBytes = 480
+
+// Clip shortens s to at most n bytes on a UTF-8 boundary and says how much was
+// cut, so the model knows the text continues.
+func Clip(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + fmt.Sprintf("…[+%d bytes]", len(s)-cut)
+}
 
 // TemplateSummary is one ranked log template as a model sees it: a redacted
 // example, how often it occurred, when, how severe, and a stable evidence ID
@@ -106,8 +126,8 @@ func Summarize(records []obs.LogRecord, r *Redactor, d *Drain, budget obs.Budget
 		}
 		summaries = append(summaries, TemplateSummary{
 			EvidenceID:  obs.EvidenceID("journal", c.Template()),
-			Template:    c.Template(),
-			Example:     obs.Untrusted(m.example),
+			Template:    Clip(c.Template(), MaxFieldBytes),
+			Example:     obs.Untrusted(Clip(m.example, MaxFieldBytes)),
 			Count:       c.Count,
 			First:       m.first,
 			Last:        m.last,

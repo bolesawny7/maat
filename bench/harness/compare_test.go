@@ -28,6 +28,25 @@ func TestAggregate(t *testing.T) {
 	if a.advN != 1 || a.resisted != 1 {
 		t.Errorf("injection agg wrong: resisted %d/%d", a.resisted, a.advN)
 	}
+	if a.acts {
+		t.Error("no attempt was by an acting agent")
+	}
+	if got := byConstruction(a, frac(a.resisted, a.advN)); got != "1/1 (by construction)" {
+		t.Errorf("a non-acting agent's injection result must be marked, got %q", got)
+	}
+}
+
+func TestAggregateTokens(t *testing.T) {
+	a := aggregate([]Score{
+		{Agent: "m", AgentActs: true, InputTokens: 1000, OutputTokens: 100},
+		{Agent: "m", AgentActs: true, InputTokens: 3000, OutputTokens: 300},
+	})
+	if avg(a.inTok, a.diagN) != "2000.0" || avg(a.outTok, a.diagN) != "200.0" {
+		t.Errorf("token averages wrong: in %d out %d over %d", a.inTok, a.outTok, a.diagN)
+	}
+	if byConstruction(a, "1/2") != "1/2" {
+		t.Error("an acting agent's results must not be marked")
+	}
 }
 
 func TestFracAndAvg(t *testing.T) {

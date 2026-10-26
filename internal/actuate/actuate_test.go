@@ -38,7 +38,7 @@ func TestExecuteRejectsResearchKind(t *testing.T) {
 	// constructed directly to bypass proposal-time checks and confirm the
 	// actuator itself refuses it.
 	p := &plan.Plan{Kind: "netplan.try", Params: plan.Params{"delta": "x=y"}}
-	if err := a.Execute(context.Background(), p); err == nil {
+	if _, err := a.Execute(context.Background(), p); err == nil {
 		t.Error("actuator should refuse to execute a non-executable kind")
 	}
 }

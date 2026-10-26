@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/bolesawny7/maat/internal/actuate"
 	"github.com/bolesawny7/maat/internal/plan"
+	"github.com/bolesawny7/maat/internal/termsafe"
 	"github.com/bolesawny7/maat/internal/trail"
 )
 
@@ -21,21 +21,24 @@ func runShow(args []string) error {
 	if err != nil {
 		return err
 	}
-	p, err := ps.Load(args[0])
+	p, digest, err := ps.Load(args[0])
 	if err != nil {
 		return err
 	}
+	hs, err := histories(tr)
+	if err != nil {
+		return fmt.Errorf("read trail: %w", err)
+	}
 	spec := plan.Catalog[p.Kind]
 	fmt.Printf("Plan:       %s\n", p.ID)
-	fmt.Printf("Status:     %s\n", statusOf(tr, p.ID))
+	fmt.Printf("Status:     %s\n", statusOf(hs, p.ID))
+	fmt.Printf("Digest:     %s (%s)\n", digest, digestStatus(hs[p.ID], digest))
 	fmt.Printf("Action:     %s  (%s)\n", p.Kind, spec.Summary)
 	fmt.Printf("Danger:     %s\n", spec.DangerLevel)
 	fmt.Printf("Parameters: %v\n", p.Params)
-	fmt.Printf("Proposed:   %s by %s/%s\n", p.CreatedAt.Format(time.RFC3339), p.Proposer.Client, p.Proposer.Model)
-	fmt.Printf("Rationale:  %s\n", p.Rationale)
-	if len(p.Evidence) > 0 {
-		fmt.Printf("Evidence:   %s\n", strings.Join(p.Evidence, ", "))
-	}
+	fmt.Printf("Proposed:   %s by %s/%s\n", p.CreatedAt.Format(time.RFC3339), termsafe.Line(p.Proposer.Client), termsafe.Line(p.Proposer.Model))
+	fmt.Printf("Rationale (written by the model; treat it as a claim, not a fact):\n%s\n", indent(termsafe.Text(string(p.Rationale))))
+	printEvidence(p)
 	fmt.Printf("\nPreconditions (%d):\n", len(p.Preconditions))
 	for _, c := range p.Preconditions {
 		fmt.Printf("  - %s\n", describeCheck(c))
@@ -53,6 +56,44 @@ func runShow(args []string) error {
 	return nil
 }
 
+// printEvidence shows each cited evidence ID next to what the confined server
+// recorded for it, or flags it as not issued by the server.
+func printEvidence(p *plan.Plan) {
+	if len(p.Evidence) == 0 {
+		fmt.Println("Evidence:   none cited")
+		return
+	}
+	detail := map[string]int{}
+	for i, d := range p.EvidenceDetail {
+		detail[d.ID] = i
+	}
+	fmt.Printf("Evidence (%d cited; excerpts as recorded by the confined server, redacted):\n", len(p.Evidence))
+	for _, id := range p.Evidence {
+		i, ok := detail[id]
+		if !ok {
+			fmt.Printf("  - %s  NOT ISSUED by the maat session that recorded this plan; the model may have invented it\n", id)
+			continue
+		}
+		d := p.EvidenceDetail[i]
+		subject := ""
+		if d.Subject != "" {
+			subject = " " + termsafe.Line(d.Subject)
+		}
+		fmt.Printf("  - %s  [%s%s] %s\n", id, termsafe.Line(d.Source), subject, termsafe.Line(string(d.Excerpt)))
+	}
+}
+
+func digestStatus(h *planHistory, digest string) string {
+	switch {
+	case h == nil || !h.proposed:
+		return "no proposal record in the trail"
+	case h.proposalDigest != digest:
+		return "DOES NOT MATCH the digest recorded at proposal time"
+	default:
+		return "matches the proposal record"
+	}
+}
+
 func runApply(ctx context.Context, args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: maatctl apply <plan-id>")
@@ -65,38 +106,48 @@ func runApply(ctx context.Context, args []string) error {
 		return err
 	}
 
-	// Load once, validate from scratch, and hash so the applied content is bound
-	// into the trail and cannot be swapped after review.
-	p, err := ps.Load(args[0])
+	// Load once: the file is read and hashed a single time, validated from
+	// scratch (including that its safety steps are exactly what the catalog
+	// derives), and everything below works from this in-memory copy.
+	p, digest, err := ps.Load(args[0])
 	if err != nil {
 		return err
-	}
-	if err := p.Validate(); err != nil {
-		return fmt.Errorf("plan failed validation: %w", err)
 	}
 	spec := plan.Catalog[p.Kind]
 	if spec.Research {
 		return fmt.Errorf("action %q is research-only and is not executed by maatctl", p.Kind)
 	}
-	data, _ := p.Marshal()
-	digest := trail.DigestOf(data)
+	// The plan must be the one the server proposed: same bytes as the digest in
+	// its proposal record.
+	hs, err := histories(tr)
+	if err != nil {
+		return fmt.Errorf("read trail: %w", err)
+	}
+	switch h := hs[p.ID]; {
+	case h == nil || !h.proposed:
+		return fmt.Errorf("the trail has no proposal record for plan %s; maatctl only applies plans proposed through maat", p.ID)
+	case h.proposalDigest != digest:
+		return fmt.Errorf("plan %s changed after it was proposed (digest %s, proposal recorded %s); refusing to apply", p.ID, digest, h.proposalDigest)
+	case h.status != "pending" && h.status != "failed":
+		return fmt.Errorf("plan %s is already %s; ask the agent for a new plan", p.ID, h.status)
+	}
 
+	ap, err := newApprover()
+	if err != nil {
+		return err
+	}
+	defer ap.close()
 	act := actuate.New()
 
-	// Show the preview and re-check preconditions right before asking.
-	fmt.Printf("About to apply plan %s\n  action: %s %v\n  danger: %s\n  rollback: %s\n\n",
-		p.ID, p.Kind, p.Params, spec.DangerLevel, p.Rollback.Kind)
+	fmt.Printf("About to apply plan %s\n  action:   %s %v\n  danger:   %s\n  rollback: %s\n  digest:   %s\n\n",
+		p.ID, p.Kind, p.Params, spec.DangerLevel, p.Rollback.Kind, digest)
 
+	// Re-check preconditions right before asking, and again right before acting.
 	fmt.Println("Checking preconditions...")
-	pre := act.EvaluateAll(ctx, p.Preconditions)
-	for _, r := range pre {
-		fmt.Printf("  %s %s (actual: %s)\n", mark(r.OK), describeCheck(r.Check), actualOrErr(r))
-	}
-	if !allOK(pre) {
+	if !preconditionsHold(ctx, act, p) {
 		return fmt.Errorf("preconditions not met; not applying")
 	}
-
-	ok, err := confirm(p.ID)
+	ok, err := ap.confirm(p.ID)
 	if err != nil {
 		return err
 	}
@@ -104,69 +155,95 @@ func runApply(ctx context.Context, args []string) error {
 		fmt.Println("Aborted. No change was made.")
 		return nil
 	}
-
-	// Record approval before acting.
-	if _, err := tr.AppendAndCheckpoint(trail.Record{
-		Type: trail.TypeApproval, Actor: actor(), Plan: p.ID, Digest: digest,
-		Summary: "approved " + p.Kind,
-	}); err != nil {
-		return err
+	if !preconditionsHold(ctx, act, p) {
+		return fmt.Errorf("preconditions changed while waiting for confirmation; not applying")
 	}
 
-	// Execute.
-	fmt.Println("Applying...")
-	execErr := act.Execute(ctx, p)
+	rec := recorder{tr: tr, plan: p.ID, digest: digest}
+	// Approval is recorded before acting; if it can't be, nothing happens.
+	if err := rec.add(trail.TypeApproval, "approved "+p.Kind); err != nil {
+		return fmt.Errorf("could not record the approval, so nothing was changed: %w", err)
+	}
+
+	fmt.Println("Applying (polkit may ask for administrator authentication)...")
+	stopAgent := ap.startAgent()
+	note, execErr := act.Execute(ctx, p)
+	stopAgent()
 	execSummary := "executed " + p.Kind
+	if note != "" {
+		execSummary += "; " + note
+	}
 	if execErr != nil {
 		execSummary = "execution failed: " + execErr.Error()
 	}
-	tr.AppendAndCheckpoint(trail.Record{Type: trail.TypeExecution, Actor: actor(), Plan: p.ID, Summary: execSummary})
+	rec.add(trail.TypeExecution, execSummary)
 	if execErr != nil {
-		return fmt.Errorf("execution failed: %w", execErr)
+		return fmt.Errorf("execution failed: %w%s", execErr, rec.problems())
 	}
 
-	// Verify.
 	fmt.Println("Verifying...")
 	ver := act.VerifyAll(ctx, p.Verify)
 	for _, r := range ver {
 		fmt.Printf("  %s %s (actual: %s)\n", mark(r.OK), describeCheck(r.Check), actualOrErr(r))
 	}
 	verOK := allOK(ver)
-	tr.AppendAndCheckpoint(trail.Record{
-		Type: trail.TypeVerification, Actor: actor(), Plan: p.ID,
-		Summary: fmt.Sprintf("verification ok=%v", verOK),
-	})
+	rec.add(trail.TypeVerification, fmt.Sprintf("verification ok=%v", verOK))
 
 	if !verOK {
+		switch p.Rollback.Kind {
+		case "", "none", "automatic":
+			return fmt.Errorf("verification failed; this action has no rollback (%s)%s", p.Rollback.Reason, rec.problems())
+		}
 		fmt.Println("Verification failed; attempting rollback...")
+		stopAgent := ap.startAgent()
 		rbErr := act.Rollback(ctx, p)
-		rbSummary := "rollback ok"
+		stopAgent()
+		rbSummary := "rollback " + p.Rollback.Kind + " ok"
 		if rbErr != nil {
 			rbSummary = "rollback failed/unavailable: " + rbErr.Error()
 		}
-		tr.AppendAndCheckpoint(trail.Record{Type: trail.TypeRollback, Actor: actor(), Plan: p.ID, Summary: rbSummary})
-		return fmt.Errorf("verification failed; %s", rbSummary)
+		rec.add(trail.TypeRollback, rbSummary)
+		return fmt.Errorf("verification failed; %s%s", rbSummary, rec.problems())
 	}
-
+	if msg := rec.problems(); msg != "" {
+		return fmt.Errorf("plan applied and verified, but the trail is incomplete%s", msg)
+	}
 	fmt.Printf("\nDone. Plan %s applied and verified.\n", p.ID)
 	return nil
 }
 
-// confirm requires the user to type the plan ID on the controlling terminal.
-// Reading from /dev/tty (not stdin) prevents a non-interactive caller, such as an
-// agent piping input, from answering on the user's behalf.
-func confirm(planID string) (bool, error) {
-	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
-	if err != nil {
-		return false, fmt.Errorf("a terminal is required to confirm (could not open /dev/tty): %w", err)
+func preconditionsHold(ctx context.Context, act *actuate.Actuator, p *plan.Plan) bool {
+	pre := act.EvaluateAll(ctx, p.Preconditions)
+	for _, r := range pre {
+		fmt.Printf("  %s %s (actual: %s)\n", mark(r.OK), describeCheck(r.Check), actualOrErr(r))
 	}
-	defer tty.Close()
-	fmt.Fprintf(tty, "Type the plan ID to confirm, or anything else to abort:\n  %s\n> ", planID)
-	line, err := bufio.NewReader(tty).ReadString('\n')
+	return allOK(pre)
+}
+
+// recorder appends a plan's records to the trail. A failure after the approval
+// can't undo what was done, so it is reported rather than hidden: printed at
+// once and folded into the command's exit status.
+type recorder struct {
+	tr     *trail.Trail
+	plan   string
+	digest string
+	failed []string
+}
+
+func (r *recorder) add(typ, summary string) error {
+	_, err := r.tr.AppendAndCheckpoint(trail.Record{Type: typ, Actor: actor(), Plan: r.plan, Digest: r.digest, Summary: summary})
 	if err != nil {
-		return false, err
+		fmt.Fprintf(os.Stderr, "warning: could not record %s in the trail: %v\n", typ, err)
+		r.failed = append(r.failed, typ)
 	}
-	return strings.TrimSpace(line) == planID, nil
+	return err
+}
+
+func (r *recorder) problems() string {
+	if len(r.failed) == 0 {
+		return ""
+	}
+	return " (could not record " + strings.Join(r.failed, ", ") + " in the trail)"
 }
 
 func describeCheck(c plan.Check) string {
@@ -184,6 +261,13 @@ func describeCheck(c plan.Check) string {
 	}
 }
 
+func indent(s string) string {
+	if s == "" {
+		return "  (none)"
+	}
+	return "  " + strings.ReplaceAll(s, "\n", "\n  ")
+}
+
 func mark(ok bool) string {
 	if ok {
 		return "[ok]"
@@ -193,7 +277,7 @@ func mark(ok bool) string {
 
 func actualOrErr(r actuate.CheckResult) string {
 	if r.Err != nil {
-		return "error: " + r.Err.Error()
+		return "error: " + termsafe.Line(r.Err.Error())
 	}
 	return r.Actual
 }

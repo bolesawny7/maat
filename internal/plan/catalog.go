@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 // Spec defines one action kind: its parameters, how to validate them, and how to
@@ -74,6 +75,19 @@ func validateUnitName(s string) error {
 	return nil
 }
 
+// validateServiceUnit accepts only .service units. Restarting a target is not a
+// service restart: RestartUnit("reboot.target") reboots the machine, and
+// "poweroff.target", "rescue.target" and "emergency.target" are just as drastic.
+func validateServiceUnit(s string) error {
+	if err := validateUnitName(s); err != nil {
+		return err
+	}
+	if !strings.HasSuffix(s, ".service") {
+		return fmt.Errorf("only .service units are accepted by this action")
+	}
+	return nil
+}
+
 func validateSnapName(s string) error {
 	if len(s) > 40 || !snapNameRe.MatchString(s) {
 		return fmt.Errorf("not a valid snap name")
@@ -97,11 +111,11 @@ var Catalog = map[string]Spec{
 		Summary:     "Restart a failed systemd service",
 		DangerLevel: "medium",
 		Params: []ParamSpec{
-			{Name: "unit", Required: true, Description: "systemd unit to restart", Validate: validateUnitName},
+			{Name: "unit", Required: true, Description: "failed .service unit to restart", Validate: validateServiceUnit},
 		},
 		Build: func(p Params) ([]Check, []Check, Rollback) {
 			unit := p["unit"]
-			pre := []Check{{Type: "unit.active_state", Unit: unit, NotEquals: "active"}}
+			pre := []Check{{Type: "unit.active_state", Unit: unit, Equals: "failed"}}
 			verify := []Check{{Type: "unit.active_state", Unit: unit, Equals: "active", WithinSeconds: 30}}
 			rb := Rollback{Kind: "none", Reason: "A restart leaves no persistent on-disk change to undo; failure is surfaced by the verification step."}
 			return pre, verify, rb
@@ -112,7 +126,7 @@ var Catalog = map[string]Spec{
 		Summary:     "Clear the failed state of a systemd unit whose cause is already resolved",
 		DangerLevel: "low",
 		Params: []ParamSpec{
-			{Name: "unit", Required: true, Description: "systemd unit to reset", Validate: validateUnitName},
+			{Name: "unit", Required: true, Description: "failed .service unit to reset", Validate: validateServiceUnit},
 		},
 		Build: func(p Params) ([]Check, []Check, Rollback) {
 			unit := p["unit"]

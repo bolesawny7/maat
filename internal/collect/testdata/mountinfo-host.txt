@@ -1,0 +1,39 @@
+26 32 0:24 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw
+27 32 0:25 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw
+28 32 0:5 / /dev rw,nosuid,relatime shared:2 - devtmpfs udev rw,size=6073756k,nr_inodes=1518439,mode=755,inode64
+29 28 0:26 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000
+30 32 0:27 / /run rw,nosuid,nodev,noexec,relatime shared:5 - tmpfs tmpfs rw,size=1222088k,mode=755,inode64
+31 26 0:28 / /sys/firmware/efi/efivars rw,nosuid,nodev,noexec,relatime shared:8 - efivarfs efivarfs rw
+32 1 253:1 / / rw,relatime shared:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+33 26 0:6 / /sys/kernel/security rw,nosuid,nodev,noexec,relatime shared:9 - securityfs securityfs rw
+34 28 0:29 / /dev/shm rw,nosuid,nodev shared:4 - tmpfs tmpfs rw,inode64
+35 30 0:30 / /run/lock rw,nosuid,nodev,noexec,relatime shared:6 - tmpfs tmpfs rw,size=5120k,inode64
+36 26 0:31 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:10 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot
+37 26 0:32 / /sys/fs/pstore rw,nosuid,nodev,noexec,relatime shared:11 - pstore pstore rw
+38 26 0:33 / /sys/fs/bpf rw,nosuid,nodev,noexec,relatime shared:12 - bpf bpf rw,mode=700
+40 27 0:34 / /proc/sys/fs/binfmt_misc rw,relatime shared:14 - autofs systemd-1 rw,fd=32,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=2426
+41 26 0:12 / /sys/kernel/tracing rw,nosuid,nodev,noexec,relatime shared:15 - tracefs tracefs rw
+42 26 0:7 / /sys/kernel/debug rw,nosuid,nodev,noexec,relatime shared:16 - debugfs debugfs rw
+43 28 0:35 / /dev/hugepages rw,nosuid,nodev,relatime shared:17 - hugetlbfs hugetlbfs rw,pagesize=2M
+44 28 0:22 / /dev/mqueue rw,nosuid,nodev,noexec,relatime shared:18 - mqueue mqueue rw
+45 26 0:36 / /sys/fs/fuse/connections rw,nosuid,nodev,noexec,relatime shared:19 - fusectl fusectl rw
+67 26 0:23 / /sys/kernel/config rw,nosuid,nodev,noexec,relatime shared:20 - configfs configfs rw
+47 32 259:0 / /boot rw,relatime shared:30 - ext4 /dev/vda16 rw
+49 47 253:15 / /boot/efi rw,relatime shared:47 - vfat /dev/vda15 rw,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+39 40 0:41 / /proc/sys/fs/binfmt_misc rw,nosuid,nodev,noexec,relatime shared:45 - binfmt_misc binfmt_misc rw
+53 32 0:44 / /Users/dev/maat rw,relatime shared:147 - virtiofs mount0 rw
+62 30 0:49 / /run/user/502 rw,nosuid,nodev,relatime shared:184 - tmpfs tmpfs rw,size=1222088k,nr_inodes=305522,mode=700,uid=502,gid=1000,inode64
+96 32 253:16 / /mnt/lima-cidata ro,relatime shared:350 - iso9660 /dev/vdb ro,nojoliet,overriderockperm,check=s,map=n,blocksize=2048,uid=0,dmode=700,fmode=700,iocharset=utf8
+58 32 7:0 / /snap/snapd/28255 ro,nodev,relatime shared:183 - squashfs /dev/loop0 ro,errors=continue,threads=single
+55 32 7:1 / /snap/core24/2125 ro,nodev,relatime shared:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+159 32 7:2 / /snap/snapcraft/19389 ro,nodev,relatime shared:180 - squashfs /dev/loop2 ro,errors=continue,threads=single
+167 32 7:3 / /snap/lxd/40961 ro,nodev,relatime shared:191 - squashfs /dev/loop3 ro,errors=continue,threads=single
+237 30 0:27 /snapd/ns /run/snapd/ns rw,nosuid,nodev,noexec,relatime - tmpfs tmpfs rw,size=1222088k,mode=755,inode64
+251 237 0:4 mnt:[4026532348] /run/snapd/ns/lxd.mnt rw - nsfs nsfs rw
+514 32 0:52 / /var/snap/lxd/common/ns rw,relatime - tmpfs tmpfs rw,size=1024k,mode=700,inode64
+525 514 0:4 mnt:[4026532349] /var/snap/lxd/common/ns/shmounts rw - nsfs nsfs rw
+502 514 0:4 mnt:[4026532348] /var/snap/lxd/common/ns/mntns rw - nsfs nsfs rw
+530 32 7:4 / /snap/go/11385 ro,nodev,relatime shared:332 - squashfs /dev/loop4 ro,errors=continue,threads=single
+570 32 7:7 / /snap/maat/x3 ro,nodev,relatime shared:677 - squashfs /dev/loop7 ro,errors=continue,threads=single
+1243 32 7:13 / /snap/maat/x4 ro,nodev,relatime shared:1031 - squashfs /dev/loop13 ro,errors=continue,threads=single
+554 237 0:4 mnt:[4026532457] /run/snapd/ns/maat.mnt rw - nsfs nsfs rw

@@ -12,6 +12,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/bolesawny7/maat/internal/brand"
 	"github.com/bolesawny7/maat/internal/condense"
 	"github.com/bolesawny7/maat/internal/config"
 	"github.com/bolesawny7/maat/internal/mcpserver"
@@ -20,6 +21,7 @@ import (
 	"github.com/bolesawny7/maat/internal/planstore"
 	"github.com/bolesawny7/maat/internal/report"
 	"github.com/bolesawny7/maat/internal/selftest"
+	"github.com/bolesawny7/maat/internal/termsafe"
 	"github.com/bolesawny7/maat/internal/trail"
 )
 
@@ -47,7 +49,11 @@ func main() {
 	case "selftest":
 		err = runSelftest(ctx, os.Args[2:])
 	case "version", "--version", "-v":
-		fmt.Println("maat", version)
+		if brand.IsTerminal(os.Stdout) {
+			banner(os.Stdout)
+		} else {
+			fmt.Println("maat", version)
+		}
 	case "help", "--help", "-h":
 		usage()
 	default:
@@ -56,12 +62,19 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "maat:", err)
+		fmt.Fprintln(os.Stderr, "maat:", termsafe.Text(err.Error()))
 		os.Exit(1)
 	}
 }
 
+// banner shows the logo on a terminal; maat mcp never calls it, because its
+// standard output is the protocol channel.
+func banner(f *os.File) {
+	brand.Banner(f, "M A A T", "confined, auditable diagnostics for AI agents", "version "+version)
+}
+
 func usage() {
+	banner(os.Stderr)
 	fmt.Fprint(os.Stderr, `maat — confined system diagnostics for AI agents
 
 Usage:
@@ -100,10 +113,19 @@ func buildDeps() (*mcpserver.Deps, error) {
 		Plans:    ps,
 		Trail:    tr,
 		Proposer: plan.Proposer{Client: os.Getenv("MAAT_CLIENT")},
+		Version:  version,
 	}, nil
 }
 
+// runMCP serves the tools to a model. It refuses to run as root: as a normal
+// user, ordinary file permissions keep even a compromised server from using the
+// two settings log-observe makes writable (the kernel's printk rate limit and
+// AppArmor's audit mode, both writable by root only), and from reading other
+// users' data.
 func runMCP(ctx context.Context) error {
+	if os.Geteuid() == 0 {
+		return fmt.Errorf("refusing to serve a model as root; run maat as your own user (add it to the systemd-journal group for journal access)")
+	}
 	deps, err := buildDeps()
 	if err != nil {
 		return err
@@ -113,7 +135,11 @@ func runMCP(ctx context.Context) error {
 }
 
 func runDiagnose(ctx context.Context) error {
-	cfg, _ := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	banner(os.Stdout)
 	report.Run(ctx, os.Stdout, condense.NewRedactor(cfg.RedactExtra...))
 	return nil
 }
@@ -123,16 +149,20 @@ func runPlans() error {
 	if err != nil {
 		return err
 	}
-	plans, err := ps.List()
+	entries, err := ps.List()
 	if err != nil {
 		return err
 	}
-	if len(plans) == 0 {
+	if len(entries) == 0 {
 		fmt.Println("No plans recorded.")
 		return nil
 	}
-	for _, p := range plans {
-		fmt.Printf("%s  %-22s  %v\n", p.ID, p.Kind, p.Params)
+	for _, e := range entries {
+		if e.Err != nil {
+			fmt.Printf("%s  INVALID: %s\n", termsafe.Line(e.ID), termsafe.Line(e.Err.Error()))
+			continue
+		}
+		fmt.Printf("%s  %-22s  %v\n", e.Plan.ID, e.Plan.Kind, e.Plan.Params)
 	}
 	return nil
 }
@@ -149,13 +179,16 @@ func runTrail(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Records: %d\nChain OK: %v\nCheckpoints checked: %d (OK: %v)\n",
-		res.Records, res.ChainOK, res.CheckpointsChecked, res.CheckpointsOK)
+	fmt.Printf("Trail: %s\nRecords: %d\nChain OK: %v\nJournal checkpoints checked: %d (OK: %v)\n",
+		config.TrailPath(), res.Records, res.ChainOK, res.CheckpointsChecked, res.CheckpointsOK)
 	for _, p := range res.Problems {
-		fmt.Println("  problem:", p)
+		fmt.Println("  PROBLEM:", termsafe.Line(p))
 	}
-	if !res.ChainOK || !res.CheckpointsOK {
-		return fmt.Errorf("trail verification found problems")
+	for _, w := range res.Warnings {
+		fmt.Println("  warning:", termsafe.Line(w))
+	}
+	if !res.OK() {
+		return fmt.Errorf("trail verification found tampering")
 	}
 	return nil
 }
@@ -171,6 +204,7 @@ func runSelftest(ctx context.Context, args []string) error {
 	if asJSON {
 		return rep.WriteJSON(os.Stdout)
 	}
+	banner(os.Stdout)
 	rep.WriteText(os.Stdout)
 	if rep.Failed > 0 {
 		os.Exit(1)

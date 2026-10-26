@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ const (
 	TypeExecution    = "execution"
 	TypeVerification = "verification"
 	TypeRollback     = "rollback"
+	TypeRejection    = "rejection"
 	TypeCheckpoint   = "checkpoint"
 )
 
@@ -104,20 +106,28 @@ func DigestOf(data []byte) string {
 // Append adds a record under an exclusive lock, chaining it to the current head.
 // It returns the stored record (with Seq, Prev, and Hash filled in).
 func (t *Trail) Append(rec Record) (Record, error) {
+	stored, _, err := t.append(rec)
+	return stored, err
+}
+
+// append is Append that also returns the trail's ID: the hash of its first
+// record. The ID ties journal checkpoints to this particular trail, so a new
+// trail (after a reinstall, say) is told apart from a tampered one.
+func (t *Trail) append(rec Record) (Record, string, error) {
 	f, err := os.OpenFile(t.Path, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
-		return Record{}, err
+		return Record{}, "", err
 	}
 	defer f.Close()
 
 	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX); err != nil {
-		return Record{}, fmt.Errorf("lock trail: %w", err)
+		return Record{}, "", fmt.Errorf("lock trail: %w", err)
 	}
 	defer unix.Flock(int(f.Fd()), unix.LOCK_UN)
 
-	last, _, err := readLast(f)
+	first, last, _, err := readEnds(f)
 	if err != nil {
-		return Record{}, err
+		return Record{}, "", err
 	}
 
 	rec.Seq = last.Seq + 1
@@ -130,61 +140,65 @@ func (t *Trail) Append(rec Record) (Record, error) {
 	}
 	h, err := computeHash(rec)
 	if err != nil {
-		return Record{}, err
+		return Record{}, "", err
 	}
 	rec.Hash = h
 
 	line, err := json.Marshal(rec)
 	if err != nil {
-		return Record{}, err
+		return Record{}, "", err
 	}
 	if _, err := f.Seek(0, 2); err != nil {
-		return Record{}, err
+		return Record{}, "", err
 	}
 	if _, err := f.Write(append(line, '\n')); err != nil {
-		return Record{}, err
+		return Record{}, "", err
 	}
 	if err := f.Sync(); err != nil {
-		return Record{}, err
+		return Record{}, "", err
 	}
-	return rec, nil
+	trailID := first.Hash
+	if rec.Seq == 1 {
+		trailID = rec.Hash
+	}
+	return rec, trailID, nil
 }
 
 // AppendAndCheckpoint appends a record and then writes a journal checkpoint of
 // the new head. The checkpoint is best-effort: a failure to reach the journal
-// (for example, from inside a confinement that forbids it) does not fail the
-// append, because the hash chain already protects integrity.
+// does not fail the append, because the hash chain already protects integrity.
+// The returned error is non-nil only if the append itself failed.
 func (t *Trail) AppendAndCheckpoint(rec Record) (Record, error) {
-	stored, err := t.Append(rec)
+	stored, trailID, err := t.append(rec)
 	if err != nil {
 		return stored, err
 	}
-	_ = t.Checkpoint(stored)
+	_ = t.checkpoint(trailID, stored)
 	return stored, nil
 }
 
-// Checkpoint writes the chain head (seq and hash) to the journal.
-func (t *Trail) Checkpoint(head Record) error {
+// checkpoint writes the chain head (trail ID, seq and hash) to the journal.
+func (t *Trail) checkpoint(trailID string, head Record) error {
 	if t.checkpointer == nil {
 		return nil
 	}
 	return t.checkpointer(map[string]string{
 		"MESSAGE":         fmt.Sprintf("maat trail checkpoint seq=%d", head.Seq),
-		"MAAT_TRAIL_HEAD": fmt.Sprintf("%d", head.Seq),
+		"MAAT_TRAIL_ID":   trailID,
+		"MAAT_TRAIL_HEAD": strconv.Itoa(head.Seq),
 		"MAAT_TRAIL_HASH": head.Hash,
 		"MAAT_ACTOR":      head.Actor,
 	})
 }
 
-// readLast returns the last record in the open file and the count of records.
-func readLast(f *os.File) (Record, int, error) {
+// readEnds returns the first and last records in the open file and the count
+// of records.
+func readEnds(f *os.File) (first, last Record, count int, err error) {
 	if _, err := f.Seek(0, 0); err != nil {
-		return Record{}, 0, err
+		return Record{}, Record{}, 0, err
 	}
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 256*1024), 8*1024*1024)
-	var last Record
-	count := 0
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" {
@@ -192,15 +206,18 @@ func readLast(f *os.File) (Record, int, error) {
 		}
 		var r Record
 		if err := json.Unmarshal([]byte(line), &r); err != nil {
-			return Record{}, count, fmt.Errorf("corrupt trail line %d: %w", count+1, err)
+			return Record{}, Record{}, count, fmt.Errorf("corrupt trail line %d: %w", count+1, err)
+		}
+		if count == 0 {
+			first = r
 		}
 		last = r
 		count++
 	}
 	if err := sc.Err(); err != nil {
-		return Record{}, count, err
+		return Record{}, Record{}, count, err
 	}
-	return last, count, nil
+	return first, last, count, nil
 }
 
 // ReadAll returns every record in order.

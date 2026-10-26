@@ -23,13 +23,20 @@ jobs:
           out=$(gofmt -l cmd internal bench/harness)
           if [ -n "$out" ]; then echo "gofmt needed on:"; echo "$out"; exit 1; fi
       - name: go vet
-        run: go vet ./...
+        run: |
+          go vet ./...
+          go vet -tags maatbench ./cmd/maatctl
       - name: go test
         run: go test ./...
       - name: go test -race
-        run: go test -race ./internal/trail/... ./internal/condense/...
+        run: go test -race ./...
       - name: security invariants
-        run: go test ./internal/invariants/...
+        run: go test -v ./internal/invariants/...
+      - name: fuzz smoke
+        run: |
+          go test ./internal/plan/ -run '^$' -fuzz '^FuzzPlanValidate$' -fuzztime=20s
+          go test ./internal/termsafe/ -run '^$' -fuzz '^FuzzText$' -fuzztime=20s
+          go test ./internal/collect/ -run '^$' -fuzz '^FuzzParseJournalJSON$' -fuzztime=20s
       - name: govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest

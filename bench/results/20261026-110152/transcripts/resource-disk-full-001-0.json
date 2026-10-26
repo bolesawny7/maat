@@ -1,0 +1,12 @@
+[
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "content": "{\"failed\":null,\"total\":0}"
+  },
+  {
+    "role": "tool",
+    "tool": "disk_usage",
+    "content": "{\"filesystems\":[{\"avail_mb\":0,\"device\":\"tmpfs\",\"evidence_id\":\"ev_1059ffea\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":2,\"inodes_used_pct\":0,\"mount_point\":\"/mnt/appdata\",\"total_mb\":8,\"used_mb\":8,\"used_pct\":100},{\"avail_mb\":45988,\"device\":\"/dev/vda1\",\"evidence_id\":\"ev_b1bb43b2\",\"fs_type\":\"ext4\",\"inodes_total\":7733248,\"inodes_used\":253593,\"inodes_used_pct\":3.3,\"mount_point\":\"/\",\"total_mb\":58446,\"used_mb\":12441,\"used_pct\":21.3},{\"avail_mb\":0,\"device\":\"none\",\"evidence_id\":\"ev_28dd5571\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":26,\"inodes_used_pct\":0,\"mount_point\":\"/dev\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0.8},{\"avail_mb\":0,\"device\":\"tmpfs\",\"evidence_id\":\"ev_3233898c\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":3,\"inodes_used_pct\":0,\"mount_point\":\"/dev/.lxd-mounts\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":1,\"device\":\"tmpfs\",\"evidence_id\":\"ev_0753addb\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":5,\"inodes_used_pct\":0,\"mount_point\":\"/dev/lxd\",\"total_mb\":1,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":5967,\"device\":\"tmpfs\",\"evidence_id\":\"ev_9e9ce1cb\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":1,\"inodes_used_pct\":0,\"mount_point\":\"/dev/shm\",\"total_mb\":5967,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":0,\"device\":\"lxcfs\",\"evidence_id\":\"ev_38bdaa84\",\"fs_type\":\"fuse.lxcfs\",\"inodes_total\":0,\"inodes_used\":0,\"inodes_used_pct\":0,\"mount_point\":\"/proc/stat\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":2386,\"device\":\"tmpfs\",\"evidence_id\":\"ev_4ca3f0a2\",\"fs_type\":\"tmpfs\",\"inodes_total\":819200,\"inodes_used\":205,\"inodes_used_pct\":0,\"mount_point\":\"/run\",\"total_mb\":2386,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":5,\"device\":\"tmpfs\",\"evidence_id\":\"ev_3df299f1\",\"fs_type\":\"tmpfs\",\"inodes_total\":1527610,\"inodes_used\":3,\"inodes_used_pct\":0,\"mount_point\":\"/run/lock\",\"total_mb\":5,\"used_mb\":0,\"used_pct\":0}]}"
+  }
+]

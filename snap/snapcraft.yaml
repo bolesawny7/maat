@@ -1,12 +1,14 @@
 name: maat
+title: maat
 base: core24
 adopt-info: maat
+license: GPL-3.0-only
 summary: Confined, auditable system diagnostics for AI agents
 description: |
   maat exposes read-only Ubuntu diagnostics (journal, systemd units, processes,
-  filesystems, networking, AppArmor denials) to AI agents over the Model Context
-  Protocol, with the limits enforced by snap confinement rather than by the
-  model's good behaviour. It records typed, reviewable plans that a human applies
+  filesystems, AppArmor denials, network interface counters) to AI agents over
+  the Model Context Protocol, with the limits enforced by snap confinement
+  rather than by the model's good behaviour. It records typed, reviewable plans that a human applies
   with the separate, unconfined maatctl tool after authorizing them through
   polkit.
 
@@ -15,6 +17,7 @@ description: |
 
 grade: devel
 confinement: strict
+icon: docs/assets/maat-icon.svg
 
 apps:
   maat:
@@ -40,12 +43,12 @@ parts:
       craftctl set version="0.0.1-dev+$(git -C "$CRAFT_PART_SRC" rev-parse --short HEAD 2>/dev/null || echo local)"
     build-environment:
       - CGO_ENABLED: "0"
-    # `ip` is used by the network collector; the base image does not ship it.
-    stage-packages:
-      - iproute2
-    # Ship only the confined server. maatctl is unconfined and distributed
-    # separately; the benchmark harness is a developer tool. Neither belongs in
-    # the snap.
-    prime:
-      - -bin/maatctl
-      - -bin/harness
+    # Build only the confined server, stamped with the snap's version so that
+    # `maat version` and the MCP server's version match `snap list`. maatctl is
+    # unconfined and distributed separately; the benchmark harness is a
+    # developer tool. No iproute2: under this profile `ip` cannot read links or
+    # routes (that needs network-observe), so network_state uses /proc/net/dev.
+    override-build: |
+      version="0.0.1-dev+$(git -C "$CRAFT_PART_SRC" rev-parse --short HEAD 2>/dev/null || echo local)"
+      mkdir -p "$CRAFT_PART_INSTALL/bin"
+      go build -trimpath -ldflags "-X main.version=$version" -o "$CRAFT_PART_INSTALL/bin/maat" ./cmd/maat

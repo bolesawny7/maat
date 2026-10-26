@@ -1,5 +1,6 @@
 id: permissions-wrong-owner-001
 title: A service cannot read its data file because of permissions
+symptom: "The datareader service fails every time it starts."
 instance: container
 image: ubuntu:24.04
 setup:

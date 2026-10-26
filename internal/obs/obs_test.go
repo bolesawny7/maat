@@ -36,7 +36,7 @@ func TestEvidenceIDStableAndFormatted(t *testing.T) {
 	if a == c {
 		t.Error("different parts should give different IDs")
 	}
-	if len(a) != len("ev_")+6 || a[:3] != "ev_" {
+	if len(a) != len("ev_")+8 || a[:3] != "ev_" {
 		t.Errorf("unexpected ID format: %q", a)
 	}
 }

@@ -69,17 +69,17 @@ The snap uses strict confinement. Every plug below is manual-connect, and none i
 | Interface | Why maat needs it | What it grants, according to snapd's source |
 |---|---|---|
 | `log-observe` | Journal, `/var/log`, kernel log | Read `/var/log/**`, `/run/log/journal/**` and `/dev/kmsg`, and run `journalctl`. Also write access to `kernel.printk_ratelimit` and to AppArmor's audit setting, plus the `dac_override` and `dac_read_search` capabilities (F3). |
-| `system-observe` | Processes and systemd unit state | `ptrace (read)`, most of `/proc`, and systemd D-Bus property reads plus `GetUnit` and `ListUnits`. Nothing that controls units (F2). Also reads `/proc/net/*`, which covers listening sockets. |
-| `mount-observe` | Mount table and quotas | Read mount and quota information (F1) |
+| `system-observe` | Processes and systemd unit state | `ptrace (read)`, most of `/proc`, and systemd D-Bus property reads plus `GetUnit` and `ListUnits`. Nothing that controls units (F2). It does **not** cover `/proc/<pid>/net/tcp` and the other socket tables, so listening sockets can't be read under the snap; `/proc/net/dev` (interface counters) is readable (F31). |
+| `mount-observe` | Mount table and quotas | Read mount and quota information (F1). Inside the snap the mount table is the snap's own namespace; the host's mounts appear under `/var/lib/snapd/hostfs` (F34). |
 
 Deliberately left out:
 
 - **`network`.** The server never opens a network connection, so a hijacked model has no channel to send data out. The MCP client talks to the model; maat doesn't. Confirmed in the VM: without this plug, an outbound connect fails with `socket: permission denied` (F28, A2).
-- **`network-observe`.** It would power the `network_state` tool, but testing showed it also permits *outbound* TCP, which would reopen the exfiltration channel (F28). It is excluded, and `network_state` fails closed as a result. An invariant test keeps it out.
+- **`network-observe`.** It would power the `network_state` and `listening_sockets` tools, but testing showed it also permits *outbound* TCP, which would reopen the exfiltration channel (F28). It is excluded: under the snap `network_state` reports only interface names and counters, and `listening_sockets` returns an explanatory error. An invariant test keeps the plug out.
 - **`snap-refresh-observe`.** A confined app needs it (or one of two other interfaces) to read snap metadata from snapd (F10), but it's super-privileged (F5). v0 infers snap health from `snap.*` systemd units and snapd's journal entries instead. `maatctl` runs outside the snap and can read snap metadata without authentication (F10), so its previews do show revisions.
 - **`hardware-observe` and `network-setup-observe`.** Candidates for later tools. A plug is added only together with a tool that needs it, and only after the security model is updated.
 
-`log-observe` is not purely read-only (F3). maat's code never writes to those two settings, a test enforces that, and [the security model](security-model.md) lists it as a residual risk.
+`log-observe` is not purely read-only (F3). Both settings it makes writable are files only root can write, and `maat mcp` refuses to run as root, so ordinary file permissions keep even a compromised server away from them. maat's code never references them either, and a test enforces that.
 
 ### State on disk
 
@@ -96,17 +96,18 @@ Writable state lives in `$SNAP_USER_COMMON`, which is `~/snap/maat/common`. It's
 
 Each collector reads one source, through a typed API or a program run with a fixed argument list. No collector ever passes a string to a shell.
 
-| Collector | Source | Planned mechanism |
+| Collector | Source | Mechanism |
 |---|---|---|
-| Journal | systemd journal | `journalctl --output=json` with fixed flags (A1) |
-| Units | systemd | D-Bus `ListUnits`, `GetUnit` and property reads on `org.freedesktop.systemd1`, using godbus (F2, F9, A3) |
-| Kernel | `/dev/kmsg` | Direct read (F3) |
-| AppArmor | Journal | Kernel messages containing `apparmor="DENIED"` (A12) |
+| Journal | systemd journal | `journalctl --output=json` with fixed flags; needs the user in `systemd-journal` (F30) |
+| Units | systemd | D-Bus `ListUnits`, `GetUnit` and property reads on `org.freedesktop.systemd1`, using godbus (F2, F9) |
+| Kernel | journal | `journalctl -k` |
+| AppArmor | journal | Kernel and audit messages containing `apparmor="DENIED"`; D-Bus denials name the profile in `label=` |
 | Processes | `/proc` | Direct read (F2) |
-| Network | netlink or `/proc/net` | Decided in M0 (A8) |
-| Filesystems | Mount table and `statfs` | Decided in M0 (A8) |
+| Network | `ip -j` and `/proc/net/dev` | Full view outside the snap; under the snap only `/proc/net/dev` is readable, so the result is marked limited (F31) |
+| Sockets | `/proc/net/{tcp,tcp6,udp,udp6}` | Outside the snap only; under the snap the tool fails closed (F31) |
+| Filesystems | Mount table and `statfs` | One row per filesystem (bind mounts collapse by device number); under the snap the host's mounts are read from `/var/lib/snapd/hostfs` and shown with their host paths (F34) |
 
-Collectors are unit-tested against recorded fixtures. Nothing in the unit test suite touches the live system.
+Collectors are unit-tested against recorded fixtures, including mount tables captured inside and outside the real snap. Nothing in the unit test suite touches the live system.
 
 ### The condense pipeline
 
@@ -117,9 +118,9 @@ Every tool result goes through the same stages before the model sees it:
 3. **Fence untrusted text.** Text that came from logs or unit metadata is returned in clearly labelled data fields and never spliced into instructions. This reduces prompt-injection risk but can't eliminate it. Confinement and human approval are what actually contain it.
 4. **Cluster** log lines into templates with Drain (F25). Four thousand "connection refused" lines become one template with a count, first and last timestamps, and one redacted example.
 5. **Rank** by severity, recency and closeness to failing units.
-6. **Budget.** Every tool accepts `max_tokens`. Output is trimmed to fit, marked `truncated`, and can be paged with a cursor. Counts are character-based estimates unless a model-specific tokenizer is configured.
+6. **Budget.** Every text field is clipped (journald accepts lines of tens of kilobytes), and list tools accept `max_items` and `max_chars`. Output is trimmed to fit, most important first, and marked `truncated`. Sizes are character estimates, not model tokens. Paging is not implemented.
 
-Every record also gets an **evidence ID**, a short hash of its source and position. Diagnoses cite evidence IDs, the benchmark scores them, and `maatctl` shows them next to a plan so you can check the reasoning against the raw data.
+Every record also gets an **evidence ID**, a short hash of what identifies it: a unit name, a log template, a mount point. The server remembers what each ID it issued referred to (bounded, oldest first out). When the model proposes a plan, the server attaches a redacted excerpt for each cited ID and marks the IDs it never issued, so `maatctl show` displays the evidence itself and flags invented citations. A template's ID can change as Drain merges more lines into it, so IDs are stable within a session, not across queries.
 
 ### MCP surface
 
@@ -128,35 +129,42 @@ Every record also gets an **evidence ID**, a short hash of its source and positi
 - **Features:** tools only. maat doesn't use sampling, roots or logging, all three of which are deprecated in revision 2026-07-28 (F15).
 - **Annotations:** set honestly but treated as hints for clients, never as enforcement (F16). Every observer tool sets `readOnlyHint: true`. `propose_action` sets `readOnlyHint: false` and `destructiveHint: false`, because it only adds a file.
 - **Results:** structured content plus a short text summary.
+- **Identity:** the server sends a title, a description and a 64-pixel PNG icon as a data URI in its `initialize` response; it can't link to an image, having no network. Tool results identify the server in `_meta` (SEP-2575) without the icon, so it isn't repeated in every response.
 
 ## Plans
 
-A plan is a JSON document checked against a versioned schema. This example is illustrative; the schema is finalized in M3.
+A plan is a JSON document with a versioned schema (`maat.plan/v0`). This one was recorded by the confined server during the [end-to-end run](evidence/maatctl-end-to-end.txt); only its rationale is shortened here (the real one tried to repaint the reviewer's terminal):
 
 ```json
 {
   "schema": "maat.plan/v0",
-  "id": "01a174dc-f480-7cc4-9a51-2f0d8a1b6e3d",
-  "kind": "service.restart",
-  "params": { "unit": "nginx.service" },
+  "id": "01a177e3-1339-7b7e-88c8-d2cf1aed91fd",
+  "kind": "service.reset-failed",
+  "params": { "unit": "maat-stale.service" },
   "preconditions": [
-    { "check": "unit.active_state", "unit": "nginx.service", "equals": "failed" }
+    { "type": "unit.active_state", "unit": "maat-stale.service", "equals": "failed" }
   ],
   "verify": [
-    { "check": "unit.active_state", "unit": "nginx.service", "equals": "active", "within_seconds": 30 }
+    { "type": "unit.active_state", "unit": "maat-stale.service", "not_equals": "failed", "within_seconds": 10 }
   ],
-  "rollback": { "kind": "none", "reason": "A restart leaves no persistent change." },
-  "evidence": ["ev_7c1e09", "ev_91aa3f"],
-  "rationale": "Model-written text. Shown to the reviewer verbatim, never executed.",
-  "created_at": "2026-10-25T21:00:00Z",
-  "proposer": { "client": "opencode", "model": "gemma4-e4b-q4-k-m" }
+  "rollback": { "kind": "none", "reason": "Resetting failed state only clears a flag; there is nothing to undo." },
+  "evidence": ["ev_f1bd9337", "ev_deadbeef"],
+  "evidence_detail": [
+    { "id": "ev_f1bd9337", "source": "unit", "subject": "maat-stale.service",
+      "excerpt": "maat-stale.service: failed/failed (load not-found), result=exit-code, exit status 1, restarts=0" }
+  ],
+  "rationale": "The unit file is gone (load_state not-found), so only its failed flag remains. …",
+  "created_at": "2026-10-26T11:05:32.729972036Z",
+  "proposer": { "client": "demo" }
 }
 ```
 
 Rules:
 
 - **The catalog is closed.** Unknown kinds are rejected when proposed, and again when applied.
-- **Parameters are validated per kind.** For example, a unit name must be a valid systemd unit name for a loaded unit, and a snap name must follow snap naming rules.
+- **Parameters are validated per kind.** A unit must be a valid `.service` unit name (whether it is loaded and failed is a precondition checked against the live system); a snap name must follow snap naming rules.
+- **The safety steps belong to the catalog.** `maatctl` re-derives the preconditions, verification and rollback from the kind and parameters and rejects the plan if the file's differ, so a plan edited on disk can't weaken them.
+- **Model-supplied text is bounded:** at most 32 evidence IDs, each of the `ev_…` form, and a rationale of at most 4,000 bytes.
 - **Validation happens twice.** The server validates so the model gets fast feedback. `maatctl` validates again from scratch, because it can't trust anything the server wrote.
 - **IDs are UUIDv7** (RFC 9562), so plans sort by creation time.
 
@@ -168,32 +176,37 @@ Rules:
 - `snapd-control` is generally limited to brand stores (F5).
 - The Snap Store lists management tools as unsupported for classic confinement (F6).
 
-Packaging is decided in M4. The candidates are a Debian package in a Launchpad PPA, and plain release binaries.
+Packaging is still open. The candidates are a Debian package in a Launchpad PPA, and plain release binaries; until then it is built from source.
 
 ### Apply flow
 
 1. Refuse to run as root, so that polkit stays the gatekeeper and the trail records a real person.
-2. Read the plan file once into memory, compute its SHA-256 digest, and work only from that copy.
-3. Validate the schema, catalog membership and parameters again.
-4. Show a preview: what will change, the current state, the cited evidence, the verification step and the rollback.
-5. Ask for confirmation on the controlling terminal (`/dev/tty`) rather than standard input, so a non-interactive caller can't answer on your behalf.
-6. Re-check the preconditions immediately before executing, to close the window between review and execution.
-7. Call the service's API. polkit decides whether to ask for admin authentication (F8, F10). Terminal sessions need a polkit text agent, the way `systemctl` uses one (A7).
-8. Run the verification steps. If they fail and the action kind has an inverse, run it.
-9. Append approval, execution, verification and rollback records to the trail.
+2. Read the plan file once into memory, compute the SHA-256 digest of its bytes, and work only from that copy.
+3. Validate it from scratch: schema, UUID, catalog membership, parameters, bounded model text, and safety steps equal to what the catalog derives.
+4. Find the plan's proposal record in the trail and require its digest to match. A plan with no proposal record, a different digest, or an outcome already recorded (applied or rejected) is refused.
+5. Show the action, parameters, danger level, rollback and digest, and check the preconditions.
+6. Ask for confirmation on the controlling terminal (`/dev/tty`) rather than standard input, so a non-interactive caller can't answer on your behalf. The plan ID must be typed.
+7. Re-check the preconditions, to close the window between review and execution, and record the approval. If the approval can't be recorded, nothing happens.
+8. Start polkit's text agent (`/usr/bin/pkttyagent --notify-fd 3 --fallback`, as `systemctl` does) on the terminal, and call the service's API. polkit decides whether to ask for admin authentication (F8, F10, F33). With `--fallback`, a desktop agent the session already has takes precedence.
+9. Run the verification steps. If they fail and the action kind has an inverse, run it.
+10. Record execution, verification and any rollback. A record that fails after the approval is reported and makes the command exit non-zero.
+
+`maatctl show` prints everything that came from the plan file (the rationale, the proposer, evidence excerpts) with control characters, bidirectional overrides and invalid UTF-8 escaped, so a plan can't repaint the reviewer's terminal.
 
 ### Action catalog (v0)
 
 | Kind | API call | polkit action | Verification | Rollback |
 |---|---|---|---|---|
-| `service.restart` | `org.freedesktop.systemd1.Manager.RestartUnit(name, "replace")` (F9) | `org.freedesktop.systemd1.manage-units`, verb `restart` (F8) | Unit reaches `active` within the plan's time limit | None needed |
-| `service.reset-failed` | `Manager.ResetFailedUnit(name)` (F9) | Same action, verb `reset-failed` (F8) | Unit is no longer `failed` | None needed |
-| `snap.revert` | snapd `POST /v2/snaps/{name}` with `{"action": "revert"}` (F10) | `io.snapcraft.snapd.manage` (F10) | The snap's services are active | Refresh back to the recorded revision |
-| `netplan.try` (research) | netplan D-Bus `Config`, `Set`, `Try(timeout)`, then `Apply` or `Cancel` (F11) | Unknown (A6) | Connectivity check from the host | Automatic: netplan reverts if the change isn't confirmed (F12) |
+| `service.restart` | `org.freedesktop.systemd1.Manager.RestartUnit(name, "replace")` (F9) | `org.freedesktop.systemd1.manage-units`, verb `restart` (F8) | Unit reaches `active` within 30 seconds | None needed |
+| `service.reset-failed` | `Manager.ResetFailedUnit(name)` (F9) | Same action, verb `reset-failed` (F8) | Unit is no longer `failed`; a unit systemd unloaded counts as inactive (F35) | None needed |
+| `snap.revert` | snapd `POST /v2/snaps/{name}` with `{"action": "revert"}` (F10) | `io.snapcraft.snapd.manage` (F10) | The snap's services are active | Not automated: the execution record names the revision reverted from |
+| `netplan.try` (research) | Not executed | Unknown (A6) | Connectivity check from the host | Automatic: netplan reverts if the change isn't confirmed (F12) |
 
-Because systemd passes the unit and verb to polkit (F8), an admin can allow, say, restarting `nginx.service` without a password while everything else still asks. maat documents example rules but never installs them.
+Both service actions accept only `.service` units, and `service.restart` requires the unit to be `failed`.
 
-The benchmark needs to apply plans without a person at a terminal. That capability exists only in builds with the Go build tag `maatbench`, which swap terminal confirmation for confirmation from the harness. Release builds don't contain it, and CI checks that.
+Because systemd passes the unit and verb to polkit (F8), an admin can allow, say, resetting one unit without a password while everything else still asks; [the end-to-end evidence](evidence/maatctl-end-to-end.txt) shows such a rule. maat never installs rules itself.
+
+The benchmark needs to apply plans without a person at a terminal. That capability exists only in builds with the Go build tag `maatbench` (`cmd/maatctl/confirm_bench.go`), which take the confirmation from the harness instead of the terminal. Release builds don't contain it: an invariant test builds `maatctl` both ways and checks the release binary for the benchmark-only strings.
 
 ## The trail
 
@@ -206,27 +219,32 @@ Each record is one line of JSON:
 - `hash` is SHA-256 over `prev` and the canonical JSON of the record without `hash`.
 - Records hold digests and redacted summaries, never raw log text.
 - The server and `maatctl` both append, under an advisory file lock.
-- **Checkpoints.** At the end of each session and after every execution, the writer records the current `seq` and `hash` in the systemd journal under a `MAAT_TRAIL_HEAD` field. Unprivileged processes can add journal entries but can't delete them, so rewriting history leaves old checkpoints that no longer match. Journald's trusted fields, which clients can't forge (F14), show whether a checkpoint came from the confined server or from `maatctl`. Whether the confined server can submit journal entries at all is A5; if it can't, only `maatctl` writes checkpoints.
-- **Verification.** `maat trail verify` recomputes the chain and checks every checkpoint it can find in the journal. A mismatch, or two different hashes for the same `seq`, means the trail was tampered with.
-- **Limits.** Checkpoints older than the journal's retention period can't be checked, and root can rewrite anything. Admins who need protection against later tampering by root can enable journald's Forward Secure Sealing (F13).
+- **Checkpoints.** After every append, the writer records the trail's ID (the hash of its first record), the new `seq` and its `hash` in the systemd journal with `logger --journald`, which works from inside the strict snap (F32). Unprivileged processes can add journal entries but can't delete them, so rewriting history leaves old checkpoints that no longer match.
+- **Verification.** `maat trail verify` recomputes the chain and checks it against the checkpoints whose journald-assigned `_UID` is the current user's; any local user can write entries with maat's field names, but not with someone else's `_UID` (F14). For this trail's ID, a different hash for a recorded `seq`, two hashes for one `seq`, or a checkpoint beyond the file's last record (truncation) is reported as tampering. Checkpoints of a different trail ID are reported as warnings: they're what a reinstall leaves behind, and also what replacing the whole file looks like.
+- **Limits.** Replacing the entire trail is reported, not prevented, and only as a warning. Checkpoints older than the journal's retention period can't be checked, and root can rewrite anything. journald's trusted `_EXE` and `_CMDLINE` fields would say which program wrote a checkpoint, but they are often missing for a short-lived `logger` process (F32), so the trail doesn't rely on them. Admins who need protection against later tampering by root can enable journald's Forward Secure Sealing (F13).
 
 ## The benchmark harness
 
-The harness lives in `bench/` and runs on the host, not in the snap. It drives LXD, contains its own minimal agent loop so that results don't depend on any particular MCP client, and talks to models through OpenAI-compatible endpoints (F18). The design is in [bench/README.md](../bench/README.md).
+The harness lives in `bench/` and runs on the host, not in the snap. It drives LXD, contains its own minimal agent loop so that results don't depend on any particular MCP client, and talks to models through OpenAI-compatible endpoints (F18). Inside each container maat runs unconfined but as an unprivileged user in `systemd-journal`, and fixes are applied by the `maatbench` build of `maatctl` under a polkit rule scoped to that user (F36). The design is in [bench/README.md](../bench/README.md).
 
-## Repository layout (planned)
+## Repository layout
 
 ```
 cmd/maat/            server and CLI, shipped in the snap
 cmd/maatctl/         plan review and execution, shipped outside the snap
-internal/collect/    journal, systemd, /proc, network, filesystems
-internal/condense/   redaction, fencing, Drain clustering, ranking, budgets
-internal/mcpserver/  tool definitions and handlers
+internal/collect/    journal, systemd, /proc, network, filesystems, AppArmor
+internal/condense/   redaction, Drain clustering, ranking, clipping, budgets
+internal/mcpserver/  tool definitions and handlers, evidence registry
 internal/plan/       schema, catalog, validation
-internal/actuate/    preview, apply, verify and rollback for each action kind
+internal/planstore/  plan files and their digests
+internal/actuate/    checks, execution and rollback for each action kind
 internal/trail/      hash chain, locking, journal checkpoints, verification
-bench/               scenarios, harness, scoring
+internal/termsafe/   rendering untrusted text for a terminal
+internal/selftest/   confinement probes
+internal/report/     maat diagnose
+bench/               scenarios, harness, scoring, results
 snap/snapcraft.yaml  strict confinement and plugs
+scripts/             VM setup and the end-to-end demo
 docs/
 ```
 
@@ -253,4 +271,4 @@ docs/
 
 ## Platforms
 
-Ubuntu 24.04 LTS and 26.04 LTS on amd64 first, then arm64 once CI covers it. The snap base and the Go toolchain used in the build are chosen in M0 (A15), targeting the supported Go releases (F19).
+Ubuntu 24.04 LTS and 26.04 LTS on amd64 and arm64. So far everything has been run on 24.04 arm64; 26.04 and amd64 are untested. The snap uses base `core24` and the `go` build snap (A15, decided), targeting the supported Go releases (F19).

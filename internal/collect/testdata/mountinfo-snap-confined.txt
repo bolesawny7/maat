@@ -1,0 +1,84 @@
+52 46 0:70 / / rw,relatime - tmpfs none rw,inode64
+54 52 7:1 /bin.usr-is-merged /bin.usr-is-merged ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+56 52 7:1 /boot /boot ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+60 56 259:0 / /boot ro,relatime master:30 - ext4 /dev/vda16 rw
+61 52 7:1 /host /host ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+63 52 7:1 /lib.usr-is-merged /lib.usr-is-merged ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+64 52 7:1 /meta /meta ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+65 52 7:1 /opt /opt ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+68 52 7:1 /sbin.usr-is-merged /sbin.usr-is-merged ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+69 52 7:1 /srv /srv ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+70 52 7:1 /usr /usr ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+71 70 253:1 /usr/lib/modules /usr/lib/modules rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+72 70 253:1 /usr/lib/firmware /usr/lib/firmware rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+73 70 253:1 /usr/src /usr/src rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+74 70 7:0 /usr/lib/snapd /usr/lib/snapd ro,nodev,relatime master:183 - squashfs /dev/loop0 ro,errors=continue,threads=single
+75 52 7:1 /var /var ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+76 75 253:1 /var/snap /var/snap rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+77 76 0:52 / /var/snap/lxd/common/ns rw,relatime - tmpfs tmpfs rw,size=1024k,mode=700,inode64
+78 75 253:1 /var/lib/snapd /var/lib/snapd rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+79 78 253:1 /var/lib/snapd/hostfs /var/lib/snapd/hostfs rw,relatime - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+80 79 253:1 / /var/lib/snapd/hostfs rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+81 80 0:27 / /var/lib/snapd/hostfs/run rw,nosuid,nodev,noexec,relatime master:5 - tmpfs tmpfs rw,size=1222088k,mode=755,inode64
+82 81 0:30 / /var/lib/snapd/hostfs/run/lock rw,nosuid,nodev,noexec,relatime master:6 - tmpfs tmpfs rw,size=5120k,inode64
+83 81 0:49 / /var/lib/snapd/hostfs/run/user/502 rw,nosuid,nodev,relatime master:184 - tmpfs tmpfs rw,size=1222088k,nr_inodes=305522,mode=700,uid=502,gid=1000,inode64
+84 81 0:27 /snapd/ns /var/lib/snapd/hostfs/run/snapd/ns rw,nosuid,nodev,noexec,relatime - tmpfs tmpfs rw,size=1222088k,mode=755,inode64
+85 80 259:0 / /var/lib/snapd/hostfs/boot rw,relatime master:30 - ext4 /dev/vda16 rw
+86 85 253:15 / /var/lib/snapd/hostfs/boot/efi rw,relatime master:47 - vfat /dev/vda15 rw,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+87 80 0:44 / /var/lib/snapd/hostfs/Users/dev/maat rw,relatime master:147 - virtiofs mount0 rw
+88 80 253:16 / /var/lib/snapd/hostfs/mnt/lima-cidata ro,relatime master:350 - iso9660 /dev/vdb ro,nojoliet,overriderockperm,check=s,map=n,blocksize=2048,uid=0,dmode=700,fmode=700,iocharset=utf8
+89 80 7:0 / /var/lib/snapd/hostfs/snap/snapd/28255 ro,nodev,relatime master:183 - squashfs /dev/loop0 ro,errors=continue,threads=single
+90 80 7:1 / /var/lib/snapd/hostfs/snap/core24/2125 ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+91 80 7:2 / /var/lib/snapd/hostfs/snap/snapcraft/19389 ro,nodev,relatime master:180 - squashfs /dev/loop2 ro,errors=continue,threads=single
+92 80 7:3 / /var/lib/snapd/hostfs/snap/lxd/40961 ro,nodev,relatime master:191 - squashfs /dev/loop3 ro,errors=continue,threads=single
+93 80 0:52 / /var/lib/snapd/hostfs/var/snap/lxd/common/ns rw,relatime - tmpfs tmpfs rw,size=1024k,mode=700,inode64
+124 80 7:4 / /var/lib/snapd/hostfs/snap/go/11385 ro,nodev,relatime master:332 - squashfs /dev/loop4 ro,errors=continue,threads=single
+125 80 7:7 / /var/lib/snapd/hostfs/snap/maat/x3 ro,nodev,relatime master:677 - squashfs /dev/loop7 ro,errors=continue,threads=single
+126 80 7:13 / /var/lib/snapd/hostfs/snap/maat/x4 ro,nodev,relatime master:1031 - squashfs /dev/loop13 ro,errors=continue,threads=single
+127 75 253:1 /var/tmp /var/tmp rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+129 75 253:1 /var/log /var/log rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+130 52 7:1 /writable /writable ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+131 52 0:5 / /dev rw,nosuid,relatime master:2 - devtmpfs udev rw,size=6073756k,nr_inodes=1518439,mode=755,inode64
+132 131 0:26 / /dev/pts rw,nosuid,noexec,relatime master:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000
+133 132 0:74 / /dev/pts rw,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+134 131 0:29 / /dev/shm rw,nosuid,nodev master:4 - tmpfs tmpfs rw,inode64
+135 131 0:35 / /dev/hugepages rw,nosuid,nodev,relatime master:17 - hugetlbfs hugetlbfs rw,pagesize=2M
+136 131 0:22 / /dev/mqueue rw,nosuid,nodev,noexec,relatime master:18 - mqueue mqueue rw
+137 131 0:74 /ptmx /dev/ptmx rw,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+138 52 253:1 /etc /etc rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+139 138 7:1 /etc/nsswitch.conf /etc/nsswitch.conf ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+140 138 7:1 /etc/apparmor /etc/apparmor ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+141 138 7:1 /etc/apparmor.d /etc/apparmor.d ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+142 52 253:1 /home /home rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+143 52 253:1 /root /root rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+144 52 0:25 / /proc rw,nosuid,nodev,noexec,relatime master:13 - proc proc rw
+145 144 0:34 / /proc/sys/fs/binfmt_misc rw,relatime master:14 - autofs systemd-1 rw,fd=32,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=2426
+146 145 0:41 / /proc/sys/fs/binfmt_misc rw,nosuid,nodev,noexec,relatime master:45 - binfmt_misc binfmt_misc rw
+147 52 0:24 / /sys rw,nosuid,nodev,noexec,relatime master:7 - sysfs sysfs rw
+148 147 0:28 / /sys/firmware/efi/efivars rw,nosuid,nodev,noexec,relatime master:8 - efivarfs efivarfs rw
+149 147 0:6 / /sys/kernel/security rw,nosuid,nodev,noexec,relatime master:9 - securityfs securityfs rw
+150 147 0:31 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime master:10 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot
+151 147 0:32 / /sys/fs/pstore rw,nosuid,nodev,noexec,relatime master:11 - pstore pstore rw
+152 147 0:33 / /sys/fs/bpf rw,nosuid,nodev,noexec,relatime master:12 - bpf bpf rw,mode=700
+153 147 0:12 / /sys/kernel/tracing rw,nosuid,nodev,noexec,relatime master:15 - tracefs tracefs rw
+155 147 0:7 / /sys/kernel/debug rw,nosuid,nodev,noexec,relatime master:16 - debugfs debugfs rw
+156 147 0:36 / /sys/fs/fuse/connections rw,nosuid,nodev,noexec,relatime master:19 - fusectl fusectl rw
+157 147 0:23 / /sys/kernel/config rw,nosuid,nodev,noexec,relatime master:20 - configfs configfs rw
+166 52 253:1 /tmp /tmp rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+168 166 253:1 /tmp/snap-private-tmp/snap.maat/tmp /tmp rw,relatime - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+169 52 0:27 / /run rw,nosuid,nodev,noexec,relatime master:5 - tmpfs tmpfs rw,size=1222088k,mode=755,inode64
+170 169 0:30 / /run/lock rw,nosuid,nodev,noexec,relatime master:6 - tmpfs tmpfs rw,size=5120k,inode64
+171 169 0:49 / /run/user/502 rw,nosuid,nodev,relatime master:184 - tmpfs tmpfs rw,size=1222088k,nr_inodes=305522,mode=700,uid=502,gid=1000,inode64
+172 169 0:27 /snapd/ns /run/snapd/ns rw,nosuid,nodev,noexec,relatime - tmpfs tmpfs rw,size=1222088k,mode=755,inode64
+174 169 0:27 /netns /run/netns rw,nosuid,nodev,noexec,relatime shared:5 - tmpfs tmpfs rw,size=1222088k,mode=755,inode64
+175 52 253:1 /media /media rw,relatime shared:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+199 52 253:1 /mnt /mnt rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+214 199 253:16 / /mnt/lima-cidata ro,relatime master:350 - iso9660 /dev/vdb ro,nojoliet,overriderockperm,check=s,map=n,blocksize=2048,uid=0,dmode=700,fmode=700,iocharset=utf8
+215 52 253:1 /snap /snap rw,relatime master:1 - ext4 /dev/vda1 rw,discard,errors=remount-ro,commit=30
+216 215 7:0 / /snap/snapd/28255 ro,nodev,relatime master:183 - squashfs /dev/loop0 ro,errors=continue,threads=single
+217 215 7:1 / /snap/core24/2125 ro,nodev,relatime master:55 - squashfs /dev/loop1 ro,errors=continue,threads=single
+218 215 7:2 / /snap/snapcraft/19389 ro,nodev,relatime master:180 - squashfs /dev/loop2 ro,errors=continue,threads=single
+219 215 7:3 / /snap/lxd/40961 ro,nodev,relatime master:191 - squashfs /dev/loop3 ro,errors=continue,threads=single
+220 215 7:4 / /snap/go/11385 ro,nodev,relatime master:332 - squashfs /dev/loop4 ro,errors=continue,threads=single
+221 215 7:7 / /snap/maat/x3 ro,nodev,relatime master:677 - squashfs /dev/loop7 ro,errors=continue,threads=single
+334 215 7:13 / /snap/maat/x4 ro,nodev,relatime master:1031 - squashfs /dev/loop13 ro,errors=continue,threads=single

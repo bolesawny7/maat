@@ -6,6 +6,7 @@ package actuate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -57,10 +58,16 @@ func (a *Actuator) VerifyAll(ctx context.Context, checks []plan.Check) []CheckRe
 		for {
 			ok, actual, err := a.evaluate(ctx, c)
 			last = CheckResult{Check: c, OK: ok, Actual: actual, Err: err}
-			if ok || time.Now().After(deadline) || ctx.Err() != nil {
+			if ok || time.Now().After(deadline) {
 				break
 			}
-			time.Sleep(500 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+			case <-time.After(500 * time.Millisecond):
+			}
+			if ctx.Err() != nil {
+				break
+			}
 		}
 		out = append(out, last)
 	}
@@ -72,6 +79,9 @@ func (a *Actuator) evaluate(ctx context.Context, c plan.Check) (ok bool, actual 
 	switch c.Type {
 	case "unit.active_state":
 		st, err := collect.GetUnitStatus(ctx, c.Unit)
+		if errors.Is(err, collect.ErrUnitNotLoaded) {
+			return compare(c, "inactive"), "inactive (not loaded)", nil
+		}
 		if err != nil {
 			return false, "", err
 		}
@@ -117,19 +127,25 @@ func compare(c plan.Check, actual string) bool {
 	return true
 }
 
-// Execute performs the action described by the plan. The plan must already have
-// been validated and its preconditions checked by the caller.
-func (a *Actuator) Execute(ctx context.Context, p *plan.Plan) error {
+// Execute performs the action described by the plan and returns a short note
+// for the trail (for snap.revert, the revision it reverted from, which is what a
+// manual rollback needs). The plan must already have been validated and its
+// preconditions checked by the caller.
+func (a *Actuator) Execute(ctx context.Context, p *plan.Plan) (string, error) {
 	switch p.Kind {
 	case "service.restart":
-		return a.systemdUnitCall(ctx, "RestartUnit", p.Params["unit"], "replace")
+		return "", a.systemdUnitCall(ctx, "RestartUnit", p.Params["unit"], "replace")
 	case "service.reset-failed":
-		return a.systemdResetFailed(ctx, p.Params["unit"])
+		return "", a.systemdResetFailed(ctx, p.Params["unit"])
 	case "snap.revert":
-		_, err := a.snapd.Revert(ctx, p.Params["snap"])
-		return err
+		prev, err := a.snapd.Revert(ctx, p.Params["snap"])
+		note := ""
+		if prev != "" {
+			note = "reverted from revision " + prev
+		}
+		return note, err
 	default:
-		return fmt.Errorf("action kind %q is not executable by the production actuator", p.Kind)
+		return "", fmt.Errorf("action kind %q is not executable by the production actuator", p.Kind)
 	}
 }
 

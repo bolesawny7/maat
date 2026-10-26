@@ -14,12 +14,11 @@ For anything bigger than a typo, open an issue first so we can agree on the appr
 
 The rules in [AGENTS.md](AGENTS.md) apply to humans too. In short: cite sources, never fabricate results, keep the server read-only and offline, and never use a shell.
 
-## Development setup (planned)
+## Development setup
 
-- Go 1.26 or 1.27
-- Snapcraft
-- LXD, for the benchmark
-- An Ubuntu 24.04 or 26.04 machine or VM for anything that touches confinement
+- Go 1.26 or 1.27. `make all race` runs the build, tests, vet and the security invariants; `make fuzz` runs short fuzz passes. The unit tests run on any OS.
+- Snapcraft and an Ubuntu 24.04 or 26.04 machine or VM for anything that touches confinement. Claims about confinement must be checked inside the snap.
+- LXD, for the benchmark (`make bench-bin`, then `./bin/harness`). `scripts/vm-setup.sh` and `scripts/vm-setup-snap.sh` prepare a VM.
 
 ## Pull requests
 

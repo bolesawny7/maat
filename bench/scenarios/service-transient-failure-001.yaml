@@ -1,24 +1,32 @@
 id: service-transient-failure-001
-title: A service failed on a condition that has since cleared; a restart fixes it
+title: A job failed because its backend was not up yet; the backend is running now, so a restart fixes it
+symptom: "Our monitoring keeps flagging a failed unit on this machine."
 instance: container
 image: ubuntu:24.04
+# A boot-ordering race: uploader runs before backend is listening and fails to
+# connect. backend starts afterwards and stays up. The evidence that the cause
+# has passed is visible to the tools: backend.service is active (and port 8081
+# is listening), and its "Started" entry is newer than uploader's failure.
 setup:
   - |
-    printf '[Unit]\nDescription=Needs a flag file\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/test -f /run/maatflag\n' > /etc/systemd/system/needsflag.service
+    printf '[Unit]\nDescription=Report uploader\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/curl -sS -f -o /dev/null http://127.0.0.1:8081/\n' > /etc/systemd/system/uploader.service
+  - |
+    printf '[Unit]\nDescription=Report backend\n[Service]\nExecStart=/usr/bin/python3 -m http.server 8081 --bind 127.0.0.1\n' > /etc/systemd/system/backend.service
   - systemctl daemon-reload
-  - systemctl start needsflag.service || true
-  - touch /run/maatflag
+  - systemctl start uploader.service || true
+  - systemctl start backend.service
+  - sleep 2
 truth:
   root_cause: service.transient_failure
-  component: needsflag.service
+  component: uploader.service
   evidence:
     - source: journal
-      unit: needsflag.service
-      contains: ""
+      unit: uploader.service
+      contains: "Failed to connect"
 expect: fix
 acceptable_plans:
   - kind: service.restart
     params:
-      unit: needsflag.service
-health_check: "systemctl is-active --quiet needsflag.service"
-real_world: "Services that fail on a transient precondition and recover on restart are common."
+      unit: uploader.service
+health_check: "systemctl is-active --quiet uploader.service"
+real_world: "Units that start before a dependency is ready, without After=/Requires= ordering, fail at boot and succeed when restarted."

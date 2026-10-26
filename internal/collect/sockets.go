@@ -1,24 +1,28 @@
 package collect
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/bolesawny7/maat/internal/obs"
 )
 
 // Socket is a listening (TCP) or bound (UDP) socket, with the owning process
 // resolved when possible.
 type Socket struct {
-	Proto     string `json:"proto"`
-	LocalAddr string `json:"local_addr"`
-	LocalPort int    `json:"local_port"`
-	State     string `json:"state"`
-	PID       int    `json:"pid,omitempty"`
-	Comm      string `json:"comm,omitempty"`
-	inode     uint64
+	EvidenceID string `json:"evidence_id"`
+	Proto      string `json:"proto"`
+	LocalAddr  string `json:"local_addr"`
+	LocalPort  int    `json:"local_port"`
+	State      string `json:"state"`
+	PID        int    `json:"pid,omitempty"`
+	Comm       string `json:"comm,omitempty"`
+	inode      uint64
 }
 
 // TCP state codes from the kernel; 0x0A is LISTEN.
@@ -103,23 +107,39 @@ func decodeHexAddr(s string) (string, int) {
 	}
 }
 
+// ErrSocketsUnavailable means none of the /proc/net socket tables could be read.
+// Under maat's strict snap this is expected: system-observe does not grant
+// /proc/<pid>/net/*, and network-observe, which would, also permits outbound
+// connections, so maat does not use it. Reporting "no sockets" instead would
+// tell a model that nothing is listening on any port.
+var ErrSocketsUnavailable = errors.New("listening sockets are unavailable: the /proc/net socket tables cannot be read here (under maat's strict snap confinement they need the network-observe interface, which maat deliberately does not use because it also permits outbound connections)")
+
 // CollectSockets reads the four /proc/net socket tables under root, then maps
-// socket inodes to processes by scanning /proc/<pid>/fd. Use "/" for live.
+// socket inodes to processes by scanning /proc/<pid>/fd. Use "/" for live. The
+// owning process is only resolved for processes the caller may inspect, which
+// for a normal user excludes root's services.
 func CollectSockets(root string) ([]Socket, error) {
 	procDir := filepath.Join(root, "proc")
 	var sockets []Socket
+	readable := 0
 	for _, proto := range []string{"tcp", "tcp6", "udp", "udp6"} {
-		data := readFile(filepath.Join(procDir, "net", proto))
-		if data == "" {
+		data, err := os.ReadFile(filepath.Join(procDir, "net", proto))
+		if err != nil {
 			continue
 		}
-		sockets = append(sockets, parseProcNet(proto, data)...)
+		readable++
+		sockets = append(sockets, parseProcNet(proto, string(data))...)
+	}
+	if readable == 0 {
+		return nil, ErrSocketsUnavailable
 	}
 	inodeToProc := mapInodesToProcs(procDir)
 	for i := range sockets {
-		if p, ok := inodeToProc[sockets[i].inode]; ok {
-			sockets[i].PID = p.pid
-			sockets[i].Comm = p.comm
+		s := &sockets[i]
+		s.EvidenceID = obs.EvidenceID("socket", s.Proto, s.LocalAddr, strconv.Itoa(s.LocalPort))
+		if p, ok := inodeToProc[s.inode]; ok {
+			s.PID = p.pid
+			s.Comm = p.comm
 		}
 	}
 	sort.SliceStable(sockets, func(i, j int) bool {

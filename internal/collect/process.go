@@ -14,12 +14,13 @@ import (
 // Process is one process, with a CPU percentage measured over a short sampling
 // interval.
 type Process struct {
-	PID     int           `json:"pid"`
-	Comm    string        `json:"comm"`
-	State   string        `json:"state"`
-	RSSMB   int64         `json:"rss_mb"`
-	CPUPct  float64       `json:"cpu_pct"`
-	Cmdline obs.Untrusted `json:"cmdline"`
+	EvidenceID string        `json:"evidence_id"`
+	PID        int           `json:"pid"`
+	Comm       string        `json:"comm"`
+	State      string        `json:"state"`
+	RSSMB      int64         `json:"rss_mb"`
+	CPUPct     float64       `json:"cpu_pct"`
+	Cmdline    obs.Untrusted `json:"cmdline"`
 }
 
 // statSample is the subset of /proc/<pid>/stat we need to compute CPU usage.
@@ -112,8 +113,12 @@ func TopProcesses(root string, interval time.Duration, limit int) ([]Process, er
 	}
 
 	secs := interval.Seconds()
+	self := os.Getpid()
 	var procs []Process
 	for pid, s2 := range second {
+		if root == "/" && pid == self {
+			continue // maat's own sampling would otherwise top the list
+		}
 		s1, ok := first[pid]
 		cpu := 0.0
 		if ok && secs > 0 {
@@ -122,12 +127,13 @@ func TopProcesses(root string, interval time.Duration, limit int) ([]Process, er
 		}
 		rss := parseStatusRSS(readFile(filepath.Join(procDir, strconv.Itoa(pid), "status")))
 		procs = append(procs, Process{
-			PID:     pid,
-			Comm:    s2.comm,
-			State:   stateName(s2.state),
-			RSSMB:   rss / 1024,
-			CPUPct:  cpu,
-			Cmdline: cleanCmdline(readFile(filepath.Join(procDir, strconv.Itoa(pid), "cmdline"))),
+			EvidenceID: obs.EvidenceID("process", strconv.Itoa(pid), s2.comm),
+			PID:        pid,
+			Comm:       s2.comm,
+			State:      stateName(s2.state),
+			RSSMB:      rss / 1024,
+			CPUPct:     cpu,
+			Cmdline:    cleanCmdline(readFile(filepath.Join(procDir, strconv.Itoa(pid), "cmdline"))),
 		})
 	}
 	sort.SliceStable(procs, func(i, j int) bool {

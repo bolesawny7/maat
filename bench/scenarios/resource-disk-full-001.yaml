@@ -1,5 +1,6 @@
 id: resource-disk-full-001
 title: A filesystem has run out of space
+symptom: "An application that keeps its data in /mnt/appdata reports write errors."
 instance: container
 image: ubuntu:24.04
 setup:
@@ -9,6 +10,9 @@ setup:
 truth:
   root_cause: resource.disk_full
   component: /mnt/appdata
+  evidence:
+    - source: disk
+      contains: "/mnt/appdata"
 expect: diagnose_only
 acceptable_plans: []
 health_check: ""

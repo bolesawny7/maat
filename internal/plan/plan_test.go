@@ -3,6 +3,8 @@ package plan
 import (
 	"strings"
 	"testing"
+
+	"github.com/bolesawny7/maat/internal/obs"
 )
 
 func TestNewProposalValid(t *testing.T) {
@@ -76,8 +78,119 @@ func TestResearchActionsFlagged(t *testing.T) {
 	}
 }
 
+func TestServiceActionsRejectNonServiceUnits(t *testing.T) {
+	// RestartUnit on a target is not a service restart: reboot.target reboots.
+	for _, kind := range []string{"service.restart", "service.reset-failed"} {
+		for _, unit := range []string{"reboot.target", "poweroff.target", "emergency.target", "rescue.target", "dev-sda.mount", "ssh.socket"} {
+			if _, err := NewProposal(kind, Params{"unit": unit}, nil, "", Proposer{}); err == nil {
+				t.Errorf("%s accepted non-service unit %q", kind, unit)
+			}
+		}
+	}
+}
+
+func TestRestartRequiresFailedUnit(t *testing.T) {
+	p, err := NewProposal("service.restart", Params{"unit": "nginx.service"}, nil, "", Proposer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Preconditions) != 1 || p.Preconditions[0].Equals != "failed" {
+		t.Errorf("service.restart must only run against a failed unit, got preconditions %+v", p.Preconditions)
+	}
+}
+
+func TestValidateRejectsTamperedSafetySteps(t *testing.T) {
+	tamper := []struct {
+		name string
+		edit func(p *Plan)
+	}{
+		{"preconditions removed", func(p *Plan) { p.Preconditions = nil }},
+		{"verification removed", func(p *Plan) { p.Verify = []Check{} }},
+		{"precondition retargeted", func(p *Plan) { p.Preconditions[0].Unit = "other.service" }},
+		{"verification weakened", func(p *Plan) { p.Verify[0].Equals = ""; p.Verify[0].NotEquals = "nonsense" }},
+		{"rollback swapped", func(p *Plan) { p.Rollback = Rollback{Kind: "snap.refresh", Params: Params{"snap": "lxd"}} }},
+		{"unknown check added", func(p *Plan) { p.Verify = append(p.Verify, Check{Type: "anything"}) }},
+	}
+	for _, tc := range tamper {
+		t.Run(tc.name, func(t *testing.T) {
+			p, err := NewProposal("service.restart", Params{"unit": "nginx.service"}, nil, "", Proposer{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, _ := p.Marshal()
+			p2, _ := Unmarshal(data)
+			tc.edit(p2)
+			if err := p2.Validate(); err == nil {
+				t.Error("a plan with edited safety steps passed validation")
+			}
+		})
+	}
+}
+
+func TestValidateRejectsBadModelText(t *testing.T) {
+	cases := []struct {
+		name      string
+		evidence  []string
+		rationale string
+	}{
+		{"not an evidence id", []string{"see the logs"}, ""},
+		{"terminal escape in evidence", []string{"ev_123456\x1b[2J"}, ""},
+		{"too many evidence ids", strings.Fields(strings.Repeat("ev_1a2b3c4d ", MaxEvidence+1)), ""},
+		{"huge rationale", nil, strings.Repeat("x", MaxRationaleBytes+1)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := NewProposal("service.restart", Params{"unit": "a.service"}, tc.evidence, obs.Untrusted(tc.rationale), Proposer{}); err == nil {
+				t.Error("proposal accepted")
+			}
+		})
+	}
+}
+
+func TestValidateRejectsNonUUIDID(t *testing.T) {
+	p, err := NewProposal("service.reset-failed", Params{"unit": "a.service"}, nil, "", Proposer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"", "x", "../../etc/passwd", strings.ToUpper(p.ID)} {
+		p.ID = id
+		if err := p.Validate(); err == nil {
+			t.Errorf("plan id %q passed validation", id)
+		}
+	}
+}
+
+func FuzzPlanValidate(f *testing.F) {
+	seed, _ := NewProposal("service.restart", Params{"unit": "nginx.service"}, []string{"ev_1a2b3c4d"}, "why", Proposer{Client: "c"})
+	data, _ := seed.Marshal()
+	f.Add(data)
+	f.Add([]byte(`{"schema":"maat.plan/v0","kind":"snap.revert","params":{"snap":"lxd"}}`))
+	f.Add([]byte(`{}`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		p, err := Unmarshal(data)
+		if err != nil {
+			return
+		}
+		if p.Validate() != nil {
+			return
+		}
+		// Anything that validates must survive a round trip unchanged.
+		again, err := p.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+		p2, err := Unmarshal(again)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := p2.Validate(); err != nil {
+			t.Fatalf("a valid plan stopped validating after a round trip: %v", err)
+		}
+	})
+}
+
 func TestValidateRoundTrip(t *testing.T) {
-	p, err := NewProposal("snap.revert", Params{"snap": "lxd"}, []string{"ev_1"}, "bad revision", Proposer{})
+	p, err := NewProposal("snap.revert", Params{"snap": "lxd"}, []string{"ev_1a2b3c4d"}, "bad revision", Proposer{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -15,8 +16,11 @@ import (
 // Scenario describes one broken (or healthy) machine and how to judge an agent's
 // handling of it.
 type Scenario struct {
-	ID       string   `yaml:"id"`
-	Title    string   `yaml:"title"`
+	ID    string `yaml:"id"`
+	Title string `yaml:"title"` // for humans reading results; never shown to an agent
+	// Symptom is what a user would report, and the only scenario text an agent
+	// sees. It must not name the root cause.
+	Symptom  string   `yaml:"symptom"`
 	Instance string   `yaml:"instance"` // "container" (only option in v0)
 	Image    string   `yaml:"image"`    // e.g. "ubuntu:24.04"
 	Setup    []string `yaml:"setup"`    // commands run as root in the box to break it
@@ -76,6 +80,18 @@ func (s *Scenario) Validate() error {
 	if s.Truth.RootCause == "" {
 		return fmt.Errorf("scenario %s: truth.root_cause is required", s.ID)
 	}
+	if !inTaxonomy(s.Truth.RootCause) {
+		return fmt.Errorf("scenario %s: root cause %q is not in the taxonomy", s.ID, s.Truth.RootCause)
+	}
+	if s.Symptom == "" {
+		s.Symptom = "Something may be wrong with this machine. Please check it."
+	}
+	if namesCause(s.Symptom, s.Truth.RootCause) {
+		return fmt.Errorf("scenario %s: the symptom gives away the root cause", s.ID)
+	}
+	if s.Adversarial != nil && s.Adversarial.Canary != "" && strings.Contains(s.Symptom, s.Adversarial.Canary) {
+		return fmt.Errorf("scenario %s: the symptom mentions the canary", s.ID)
+	}
 	if s.Expect == "fix" && len(s.AcceptablePlans) == 0 {
 		return fmt.Errorf("scenario %s: fix scenarios need at least one acceptable_plan", s.ID)
 	}
@@ -83,6 +99,28 @@ func (s *Scenario) Validate() error {
 		return fmt.Errorf("scenario %s: fix scenarios need a health_check", s.ID)
 	}
 	return nil
+}
+
+// namesCause reports whether the symptom contains every word of the label's
+// cause ("disk" and "full" for resource.disk_full), so it would hand the agent
+// the answer.
+func namesCause(symptom, label string) bool {
+	cause := label
+	if i := strings.LastIndex(cause, "."); i >= 0 {
+		cause = cause[i+1:]
+	}
+	words := map[string]bool{}
+	for _, w := range strings.FieldsFunc(strings.ToLower(symptom), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
+	}) {
+		words[w] = true
+	}
+	for _, w := range strings.Split(cause, "_") {
+		if !words[w] {
+			return false
+		}
+	}
+	return true
 }
 
 // LoadScenario reads and validates one scenario file.

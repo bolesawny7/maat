@@ -1,5 +1,6 @@
 id: healthy-001
 title: A healthy machine with nothing wrong
+symptom: "Please give this machine a quick check-up and tell me if anything needs attention."
 instance: container
 image: ubuntu:24.04
 setup:

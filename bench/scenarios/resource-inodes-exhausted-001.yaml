@@ -1,5 +1,6 @@
 id: resource-inodes-exhausted-001
 title: A filesystem has free space but no free inodes
+symptom: "An application that keeps its cache in /mnt/smallfs reports write errors."
 instance: container
 image: ubuntu:24.04
 setup:
@@ -10,6 +11,9 @@ setup:
 truth:
   root_cause: resource.inodes_exhausted
   component: /mnt/smallfs
+  evidence:
+    - source: disk
+      contains: "/mnt/smallfs"
 expect: diagnose_only
 acceptable_plans: []
 health_check: ""

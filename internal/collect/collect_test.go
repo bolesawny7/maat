@@ -90,6 +90,43 @@ func TestParseAppArmorDenial(t *testing.T) {
 	}
 }
 
+func TestParseAppArmorDBusDenialUsesLabel(t *testing.T) {
+	// A real D-Bus mediation denial captured from the confined self-test: it has
+	// label= rather than profile=, and member= names the refused method.
+	msg := `apparmor="DENIED" operation="dbus_method_call"  bus="system" path="/org/freedesktop/systemd1" interface="org.freedesktop.systemd1.Manager" member="RestartUnit" mask="send" name="org.freedesktop.systemd1" pid=343096 label="snap.maat.maat" peer_pid=1 peer_label="unconfined"`
+	d, ok := ParseAppArmorDenial(msg)
+	if !ok {
+		t.Fatal("expected a denial")
+	}
+	if d.Profile != "snap.maat.maat" || d.Operation != "dbus_method_call" {
+		t.Errorf("profile/operation wrong: %+v", d)
+	}
+}
+
+func TestNetDevParse(t *testing.T) {
+	data := `Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo:  123456     100    0    0    0     0          0         0   123456     100    0    0    0     0       0          0
+  eth0: 9876543    5000    3    7    0     0          0        12   4567890    4000    1    2    0     0       0          0
+`
+	names, c := ParseNetDev(data)
+	if len(names) != 2 || names[1] != "eth0" {
+		t.Fatalf("names = %v", names)
+	}
+	e := c["eth0"]
+	if e.RxBytes != 9876543 || e.RxErrors != 3 || e.RxDropped != 7 || e.TxBytes != 4567890 || e.TxErrors != 1 || e.TxDropped != 2 {
+		t.Errorf("eth0 counters wrong: %+v", e)
+	}
+}
+
+func TestCollectSocketsFailsClosed(t *testing.T) {
+	// A proc root with no readable socket tables must be an error, not "nothing
+	// is listening".
+	if _, err := CollectSockets(t.TempDir()); err == nil {
+		t.Fatal("expected ErrSocketsUnavailable")
+	}
+}
+
 func TestAppArmorDenialsDeduplicate(t *testing.T) {
 	line := `apparmor="DENIED" operation="open" profile="p" name="/x" denied_mask="r"`
 	recs := []obs.LogRecord{
@@ -208,7 +245,7 @@ func TestParseIPAddrAndRoute(t *testing.T) {
 	if len(ifaces) != 2 || ifaces[1].Name != "eth0" || ifaces[1].MAC != "52:54:00:12:34:56" {
 		t.Fatalf("iface parse wrong: %+v", ifaces)
 	}
-	if !ifaces[1].Up || len(ifaces[1].Addrs) != 1 || ifaces[1].Addrs[0] != "10.0.2.15" {
+	if ifaces[1].Up == nil || !*ifaces[1].Up || len(ifaces[1].Addrs) != 1 || ifaces[1].Addrs[0] != "10.0.2.15" {
 		t.Errorf("eth0 details wrong: %+v", ifaces[1])
 	}
 

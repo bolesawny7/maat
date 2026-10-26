@@ -2,7 +2,20 @@
 
 maat is built in small milestones. Each one has deliverables, acceptance criteria that can be checked, and something worth showing publicly. Durations assume roughly 8 to 10 hours a week alongside a full-time job. Facts (F) and assumptions (A) are defined in [references.md](references.md).
 
-Nothing on this page is done yet. Mark items done only when their acceptance criteria pass.
+Mark items done only when their acceptance criteria pass.
+
+## Status (2026-10-26)
+
+| Milestone | State | Done | Not done |
+|---|---|---|---|
+| M0 | Mostly done | Strict snap built and run on 24.04; journal, units and the network and write denials confirmed; A2–A5, A7, A8, A10 and A15 resolved | 26.04; the snap name (A11); the screen recording |
+| M1 | Mostly done | All read-only tools, the condense pipeline, `maat diagnose`, CI with fixture tests, fuzz tests, `govulncheck` and invariants 1–4 | The one-million-entry budget test; invariant 5 as an automated check; the `edge` channel |
+| M2 | Partly done | Harness, deterministic scorer, scenario format, 10 scenarios (2 adversarial, 2 healthy), reference solutions run by the oracle, run configs and transcripts | 20 scenarios; 5 adversarial; **any real-model run**; the ablation; reproducibility across runs |
+| M3 | Done | Plan schema v0, catalog, `propose_action`, the trail with locking and journal checkpoints, `maat trail verify`; tests for edits, deletions, reordering and truncation; plan validation fuzz-tested | |
+| M4 | Partly done | `maatctl` with three action kinds; polkit from a terminal (A7); the benchmark's fix track through the real `maatctl` under a scoped polkit rule; invariants 6–9 | Automated `snap.revert` rollback (so the rollback acceptance criterion can't pass yet); a packaging decision; the `netplan.try` note (A6) |
+| M5 | Not started | | |
+
+The single most important next step is M2's real-model runs, preceded by harder scenarios: a keyword baseline already scores 9 of 10 on the current set.
 
 ## M0: Prove the confinement story (1 to 2 weeks)
 

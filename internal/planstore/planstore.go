@@ -6,6 +6,8 @@
 package planstore
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,6 +20,16 @@ import (
 // Store is a directory of plan files.
 type Store struct {
 	Dir string
+}
+
+// Entry is one plan file as found on disk. Err is set when the file could not be
+// read or failed validation; such entries are reported, not hidden, because a
+// plan that stopped validating may have been tampered with.
+type Entry struct {
+	ID     string
+	Plan   *plan.Plan
+	Digest string
+	Err    error
 }
 
 // Open returns a Store at dir, creating it if needed.
@@ -37,46 +49,63 @@ func (s *Store) path(id string) (string, error) {
 	return filepath.Join(s.Dir, id+".json"), nil
 }
 
-// Save writes a plan atomically (write to a temp file, then rename).
-func (s *Store) Save(p *plan.Plan) error {
+// Digest returns the content digest the trail records for plan file bytes.
+func Digest(data []byte) string {
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// Save writes a plan atomically (write to a temp file, then rename) and returns
+// the digest of the exact bytes written.
+func (s *Store) Save(p *plan.Plan) (string, error) {
 	path, err := s.path(p.ID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	data, err := p.Marshal()
 	if err != nil {
-		return err
+		return "", err
 	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
+		return "", err
 	}
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		return "", err
+	}
+	return Digest(data), nil
 }
 
-// Load reads one plan by ID and validates it.
-func (s *Store) Load(id string) (*plan.Plan, error) {
+// Load reads one plan by ID, validates it, and returns it with the digest of the
+// bytes it was parsed from. The file is read once; callers act only on the
+// returned copy, so a later change to the file cannot alter what they execute.
+func (s *Store) Load(id string) (*plan.Plan, string, error) {
 	path, err := s.path(id)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
+	digest := Digest(data)
 	p, err := plan.Unmarshal(data)
 	if err != nil {
-		return nil, err
+		return nil, digest, fmt.Errorf("plan %s is not valid JSON: %w", id, err)
+	}
+	if p.ID != id {
+		return nil, digest, fmt.Errorf("plan file %s.json contains plan id %q", id, p.ID)
 	}
 	if err := p.Validate(); err != nil {
-		return nil, fmt.Errorf("plan %s failed validation: %w", id, err)
+		return nil, digest, fmt.Errorf("plan %s failed validation: %w", id, err)
 	}
-	return p, nil
+	return p, digest, nil
 }
 
-// List returns all stored plans, newest last (UUIDv7 sorts by time).
-func (s *Store) List() ([]*plan.Plan, error) {
-	entries, err := os.ReadDir(s.Dir)
+// List returns every plan file, newest last (UUIDv7 sorts by time), including
+// files that fail to load, with the reason.
+func (s *Store) List() ([]Entry, error) {
+	dirEntries, err := os.ReadDir(s.Dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -84,20 +113,17 @@ func (s *Store) List() ([]*plan.Plan, error) {
 		return nil, err
 	}
 	var ids []string
-	for _, e := range entries {
+	for _, e := range dirEntries {
 		name := e.Name()
 		if strings.HasSuffix(name, ".json") {
 			ids = append(ids, strings.TrimSuffix(name, ".json"))
 		}
 	}
 	sort.Strings(ids)
-	var out []*plan.Plan
+	out := make([]Entry, 0, len(ids))
 	for _, id := range ids {
-		p, err := s.Load(id)
-		if err != nil {
-			continue // skip unreadable/invalid files rather than failing the list
-		}
-		out = append(out, p)
+		p, digest, err := s.Load(id)
+		out = append(out, Entry{ID: id, Plan: p, Digest: digest, Err: err})
 	}
 	return out, nil
 }

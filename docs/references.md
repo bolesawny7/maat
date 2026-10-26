@@ -143,23 +143,38 @@ These were produced by building the strict snap and running `maat selftest` and 
 
 **F28. `network-observe` permits outbound TCP.** With `network-observe` connected, the confined server completed an outbound TCP connection; with it removed, the same connect failed with `socket: permission denied`. Because that would give a hijacked model an exfiltration channel, maat does not plug `network-observe`. Consequence: the `network_state` collector (which needs netlink) fails closed under the strict profile. Enforced by the invariant test `TestOnlyApprovedPlugs`.
 
-**F29. AppArmor blocks systemd control from the confined server.** A direct `RestartUnit` call from inside the snap is refused by AppArmor: `An AppArmor policy prevents this sender from sending this message ... label="snap.maat.maat (enforce)" ... member="RestartUnit"`. This holds even though `system-observe` lets the same process list 501 units. Evidence: [selftest-confined.txt](evidence/selftest-confined.txt).
+**F29. AppArmor blocks systemd control from the confined server.** A direct `RestartUnit` call from inside the snap is refused by AppArmor itself, not by polkit: `An AppArmor policy prevents this sender from sending this message ... label="snap.maat.maat (enforce)" ... member="RestartUnit"`, with D-Bus error name `org.freedesktop.DBus.Error.AccessDenied`. This holds even though `system-observe` lets the same process list every unit (502 on that VM). Evidence: [selftest-confined.txt](evidence/selftest-confined.txt).
 
 **F30. `log-observe` grants journal access only with group membership.** The AppArmor side of `log-observe` is necessary but not sufficient: because the server runs as the invoking user (not root), reading the journal also requires that user to be in the `systemd-journal` (or `adm`) group, exactly as Red Hat's linux-mcp-server documents. Without it, `journalctl` reports "No journal files were opened due to insufficient permissions"; with the group, the read succeeds.
 
+The following were checked on **2026-10-26** on the same VM (systemd 255.4, polkitd 124, snapd 2.77.1, AppArmor 4.0.1).
+
+**F31. `system-observe` does not grant the `/proc/net` socket tables.** Inside the snap, reading `/proc/net/tcp` fails with "Permission denied", and the kernel logs `apparmor="DENIED" operation="open" profile="snap.maat.maat" name="/proc/<pid>/net/tcp"` (likewise `tcp6`, `udp`, `udp6`, `route`, `ipv6_route`). `/proc/net/dev` is readable; `/sys/class/net/` can be listed, but its attributes, `/etc/resolv.conf` and `/run/systemd/resolve/resolv.conf` are denied. Consequence: `listening_sockets` returns an explanatory error under the snap and `network_state` reports interface names and counters only. An earlier version of the socket collector swallowed the error and returned an empty list, which the self-test then reported as "yes: 0 sockets", a pass.
+
+**F32. The confined server can write journal checkpoints, but trusted program fields may be missing.** From inside the snap, `logger --journald` wrote an entry whose custom fields (`MAAT_PROBE=1`) arrived intact, with `_UID=502`, `_COMM=logger` and `_TRANSPORT=journal`. `_EXE`, `_CMDLINE` and `_SYSTEMD_CGROUP` were absent: `logger` exits before journald reads them. The trail therefore keys checkpoints on `_UID` and doesn't rely on the program fields. The [end-to-end run](evidence/maatctl-end-to-end.txt) verified checkpoints written both by the confined server and by `maatctl`.
+
+**F33. A polkit text agent makes `maatctl` work outside a desktop session.** Without an agent, a `RestartUnit` call that allows interactive authorization fails with "Interactive authentication required." (`busctl call --allow-interactive-authorization=yes ...` on the VM). With `maatctl` starting `/usr/bin/pkttyagent --notify-fd 3 --fallback` on its terminal, polkit prompted there ("==== AUTHENTICATING FOR org.freedesktop.systemd1.manage-units ===="). `pkttyagent --help` documents `--notify-fd` ("Close FD when the agent is registered") and `--fallback` ("Don't replace existing agent if any"); systemd's own tools start the agent the same way ([systemd `src/shared/polkit-agent.c`](https://github.com/systemd/systemd/blob/main/src/shared/polkit-agent.c)).
+
+**F34. Inside the snap, the mount table is the snap's, and the host's is under `hostfs`.** `/proc/self/mountinfo` in the snap shows the snap's mount namespace: `/` is a tmpfs, the base snap is mounted over `/usr`, and host directories such as `/etc` and `/home` are bind mounts of the host root filesystem. The host's mounts appear under `/var/lib/snapd/hostfs` (whose root mount is the host's `/`), and `statfs` works on them; `/proc/1/mountinfo` is denied. Both mount tables are committed as test fixtures in `internal/collect/testdata/`.
+
+**F35. systemd keeps removed failed units until they are reset.** A unit that failed, whose unit file was then deleted and the daemon reloaded, stays listed as `not-found failed failed` until `reset-failed`. After `ResetFailedUnit`, systemd unloads it, and `GetUnit` returns `org.freedesktop.systemd1.NoSuchUnit`.
+
+**F36. The `ubuntu:24.04` LXD image ships polkit with JavaScript rules.** It has `polkitd` 124 and `pkttyagent`. A rule in `/etc/polkit-1/rules.d/` matching `action.id == "org.freedesktop.systemd1.manage-units"`, `subject.user`, `action.lookup("unit")` and `action.lookup("verb")` authorizes `RestartUnit` and `ResetFailedUnit` for one user and unit without a password, while other units still prompt. Used by the benchmark and shown in the [end-to-end run](evidence/maatctl-end-to-end.txt).
+
 Resolved assumptions:
 
-- **A2 (confirmed):** no `network` plug ⇒ outbound TCP is refused at the socket layer.
+- **A2 (confirmed):** no `network` plug ⇒ creating an internet socket (TCP or UDP, IPv4 or IPv6) fails with `EACCES` (`socket: permission denied`).
 - **A3 (confirmed):** `system-observe` + godbus lists units and reads properties; `RestartUnit` is denied (F29).
 - **A4 (confirmed):** an MCP client connects to `maat mcp` over stdio, bridged through `lxc exec` in the benchmark, and calls tools successfully.
-- **A8 (partly refuted → design changed):** `mount-observe` + `/proc` cover disks and sockets; `network_state` is not available without `network-observe`, which is excluded (F28).
+- **A5 (confirmed, 2026-10-26):** the confined server can submit journal entries (F32).
+- **A7 (confirmed, 2026-10-26):** `maatctl` gets polkit authentication in a terminal session by starting `pkttyagent` (F33).
+- **A8 (refuted → design changed):** `mount-observe` covers disks once the host view is read from `hostfs` (F34), but neither the socket tables nor addresses and routes are readable without `network-observe`, which is excluded (F28, F31).
 - **A10 (confirmed):** strict snaps run in the VM; all ten benchmark scenarios reproduce in unprivileged LXD containers.
 - **A15 (decided):** base `core24`, built with the `go` build-snap (Go ≥ 1.26); builds and runs on 24.04.
 
 Partly open:
 
 - **A1:** journal access confirmed on 24.04 with the `systemd-journal` group (F30); 26.04 still to check.
-- **A5:** the trail's journal checkpoint via `logger --journald` is not yet confirmed from inside confinement; the hash chain protects integrity regardless.
 - **A12:** an AppArmor denial was produced and read back during the self-test (F29); a dedicated end-to-end denial scenario is still to add.
 
 ## Open assumptions
@@ -172,10 +187,10 @@ Each assumption names how it will be tested and the milestone that tests it. Whe
 | A2 | A strict snap app without the `network` plug can't open `AF_INET` or `AF_INET6` sockets, and the denial is logged. | Test binary attempts an outbound TCP connection; check the error and the AppArmor or seccomp log entry. | M0 |
 | A3 | With `system-observe`, a Go D-Bus client (godbus) inside the snap can call `ListUnits`, `GetUnit` and property `Get`/`GetAll`, and calls to `RestartUnit` are denied. | Call each method from the snap; record results. | M0 |
 | A4 | MCP clients (Claude Code, OpenCode) can launch the snap app over stdio, and the process runs under the snap's AppArmor label. | Register `maat mcp`, call a tool, inspect `/proc/<pid>/attr/current`. | M0 |
-| A5 | The confined server can submit entries to the journal, so it can write trail checkpoints itself. | Submit a structured entry from the snap; read it back with `journalctl -o json` and check the trusted fields. | M0 |
+| A5 | ~~The confined server can submit entries to the journal.~~ Confirmed 2026-10-26 (F32). | | M0 |
 | A6 | netplan's D-Bus API is restricted to root by its D-Bus policy and has no polkit integration. | Read `/usr/share/dbus-1/system.d/io.netplan.Netplan.conf`; call `Config` as an unprivileged user. | M4 |
-| A7 | A Go program can get polkit authentication in a terminal session the way `systemctl` does (for example by running `pkttyagent`). | Prototype a `RestartUnit` call from a non-root user over SSH and in a local session. | M4 |
-| A8 | `network-observe` and `mount-observe` cover what `network_state`, `listening_sockets` and `disk_usage` need (netlink or `/proc/net`, the mount table, `statfs` on mount points). | Implement each collector in the spike snap; record denials. | M0 |
+| A7 | ~~A Go program can get polkit authentication in a terminal session the way `systemctl` does.~~ Confirmed 2026-10-26 (F33). | | M4 |
+| A8 | ~~`network-observe` and `mount-observe` cover `network_state`, `listening_sockets` and `disk_usage`.~~ Refuted 2026-10-26 for the first two (F28, F31); `disk_usage` works through `hostfs` (F34). | | M0 |
 | A9 | The inference snaps used in the benchmark support tool calling through their OpenAI-compatible endpoint. | Send a tool-call request to each snap and engine; record which work. | M2 |
 | A10 | Snaps with strict confinement work inside LXD containers on an Ubuntu host, and each fault class can be reproduced in a container or needs a VM. | Install the spike snap in a container and a VM; reproduce each scenario's fault. | M2 |
 | A11 | The snap name `maat` is available to register (no published snap was found on 2026-10-25). | `snapcraft register maat`. | M0 |

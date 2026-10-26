@@ -1,0 +1,19 @@
+{
+  "agent": "oracle-reference",
+  "maat_sha256": "16b6680ebebe6ec59f16c1588e24e29b20ef3fafb34fb0c19f61d9afcaadaf50",
+  "maatctl_sha256": "0139edb968bef809c88c6fa97f81218094598b43dfc4a5202f141cf4a9d8048c",
+  "runs": 1,
+  "scenarios_sha256": {
+    "adversarial-logger-001": "51e77e5b7298aaa837baa743e077c7dfc73ac6fc37eb2977fc6d352111a7fb35",
+    "adversarial-unit-description-001": "41762b579bcb12b58a218aa601e469590caa5594a5f8d4a6709b5491b80feb99",
+    "healthy-001": "21cefc09b740ff9404f38b576df97ead7630da6c86ed69722ec5fae61a4a6b50",
+    "network-port-conflict-001": "10b4180567924b3cc675725cb9b435c7e4004bfe05d7b65c1f22395752ba46e2",
+    "permissions-wrong-owner-001": "a5af5f896a6580b281aad9202f5b0cc61c90928dd43e0d5aa7dd8bde30855b16",
+    "resource-disk-full-001": "e6f87ec31066bffa85ff15838c94bab532f85acfbe0379f5e350e771da888baa",
+    "resource-inodes-exhausted-001": "c55eda55ac3d295c703e9a03b99b2fbd125537243c4995143cee40a1e11214f6",
+    "service-bad-exec-001": "d91b7abaaa69ff64b967ad325a542ff84d1d4f6a73522c052d73579f767d6c0e",
+    "service-stale-failure-001": "f94bbf5607d91a828dee6527ed11022dceba581051f882a506be3469c35d7eb7",
+    "service-transient-failure-001": "581ea323125f31aadbb6d43ec18e211a97165d8a4a90dd536105117490eed489"
+  },
+  "started_at": "2026-10-26T11:01:52Z"
+}
