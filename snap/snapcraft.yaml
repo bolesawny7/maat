@@ -38,9 +38,11 @@ parts:
     source: .
     build-snaps:
       - go/stable
+    # The release workflow writes the tag's version to VERSION; any other build
+    # is a dev build.
     override-pull: |
       craftctl default
-      craftctl set version="0.0.1-dev+$(git -C "$CRAFT_PART_SRC" rev-parse --short HEAD 2>/dev/null || echo local)"
+      craftctl set version="$(cat "$CRAFT_PART_SRC/VERSION" 2>/dev/null || echo "0.0.1-dev+$(git -C "$CRAFT_PART_SRC" rev-parse --short HEAD 2>/dev/null || echo local)")"
     build-environment:
       - CGO_ENABLED: "0"
     # Build only the confined server, stamped with the snap's version so that
@@ -49,6 +51,5 @@ parts:
     # developer tool. No iproute2: under this profile `ip` cannot read links or
     # routes (that needs network-observe), so network_state uses /proc/net/dev.
     override-build: |
-      version="0.0.1-dev+$(git -C "$CRAFT_PART_SRC" rev-parse --short HEAD 2>/dev/null || echo local)"
       mkdir -p "$CRAFT_PART_INSTALL/bin"
-      go build -trimpath -ldflags "-X main.version=$version" -o "$CRAFT_PART_INSTALL/bin/maat" ./cmd/maat
+      go build -trimpath -ldflags "-X main.version=$(craftctl get version)" -o "$CRAFT_PART_INSTALL/bin/maat" ./cmd/maat

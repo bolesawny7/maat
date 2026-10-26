@@ -1,0 +1,105 @@
+name: Release
+
+# A pushed tag such as v0.1.0 builds the snap and maatctl for amd64 and arm64 and
+# publishes them as a GitHub release. Running the workflow by hand builds them
+# without publishing. See docs/releasing.md.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snap:
+    name: snap (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stamp the version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then v=${GITHUB_REF_NAME#v}; else v=0.0.1-dev+${GITHUB_SHA::7}; fi
+          echo "$v" > VERSION
+      - name: Build snap
+        id: build
+        uses: snapcore/action-build@v1
+      - run: mv "${{ steps.build.outputs.snap }}" maat_${{ matrix.arch }}.snap
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap-${{ matrix.arch }}
+          path: maat_${{ matrix.arch }}.snap
+          if-no-files-found: error
+
+  maatctl:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          check-latest: true
+      - name: Build maatctl
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then v=${GITHUB_REF_NAME#v}; else v=0.0.1-dev+${GITHUB_SHA::7}; fi
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-X main.version=$v" -o maatctl_linux_$arch ./cmd/maatctl
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maatctl
+          path: maatctl_linux_*
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [snap, maatctl]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum maat_*.snap maatctl_linux_* > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "maat $GITHUB_REF_NAME" \
+            --notes "Developer preview. To install, see the [Quickstart](https://github.com/$GITHUB_REPOSITORY#quickstart). The snaps aren't signed by the Snap Store, so they install with \`--dangerous\`; SHA256SUMS lists their checksums." \
+            maat_*.snap maatctl_linux_* SHA256SUMS
+
+  # Uploads both snaps to the Snap Store's edge channel, but only once the
+  # repository has a SNAPCRAFT_STORE_CREDENTIALS secret (docs/releasing.md says
+  # how to make one). The secret stays in this job, which runs no project code.
+  store:
+    if: github.ref_type == 'tag'
+    needs: snap
+    runs-on: ubuntu-24.04
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    steps:
+      - if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
+        uses: actions/download-artifact@v4
+        with:
+          pattern: snap-*
+          merge-multiple: true
+      - if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
+        uses: snapcore/action-publish@v1
+        with:
+          snap: maat_amd64.snap
+          release: edge
+      - if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
+        uses: snapcore/action-publish@v1
+        with:
+          snap: maat_arm64.snap
+          release: edge

@@ -15,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/bolesawny7/maat/internal/brand"
+	"github.com/bolesawny7/maat/internal/buildinfo"
 	"github.com/bolesawny7/maat/internal/config"
 	"github.com/bolesawny7/maat/internal/planstore"
 	"github.com/bolesawny7/maat/internal/termsafe"
@@ -22,6 +23,8 @@ import (
 )
 
 var version = "0.0.0-dev"
+
+func init() { version = buildinfo.Version(version) }
 
 func main() {
 	if len(os.Args) < 2 {

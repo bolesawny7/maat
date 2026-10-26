@@ -7,6 +7,12 @@
 
 <p align="center"><b>Let AI agents troubleshoot Ubuntu machines, with permissions enforced by the kernel instead of the prompt.</b></p>
 
+<p align="center">
+  <img src="docs/assets/maatctl-show-hostile-plan.png" alt="maatctl show on a plan written the way a hijacked model would: its hidden terminal escape codes appear as plain text, and its invented evidence ID is flagged NOT ISSUED" width="900">
+  <br>
+  <sub>A plan written the way a hijacked model would, as <code>maatctl</code> shows it to the person reviewing it: the hidden escape codes appear as text, and the invented evidence ID is flagged.</sub>
+</p>
+
 *The name: **Ma'at** was the ancient Egyptian principle of truth and balance — the standard a life was weighed against, with the result recorded by Thoth. This tool weighs every proposed change before allowing it, and keeps the record.*
 
 maat is an open-source [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server and toolkit for diagnosing and repairing Ubuntu systems with AI agents:
@@ -146,11 +152,12 @@ The oracle proves every scenario is solvable, leaves the evidence it needs, and 
 
 ## Quickstart
 
-The snap isn't in the Store yet; build it from source on Ubuntu ([docs/demo.md](docs/demo.md) has the full walk-through):
+maat runs on Ubuntu 24.04 or later. Install the snap from the [latest release](https://github.com/bolesawny7/maat/releases/latest) and connect its three interfaces:
 
 ```bash
-snapcraft pack
-sudo snap install --dangerous maat_*.snap
+arch=$(dpkg --print-architecture)   # amd64 or arm64
+curl -LO "https://github.com/bolesawny7/maat/releases/latest/download/maat_$arch.snap"
+sudo snap install --dangerous "./maat_$arch.snap"   # --dangerous: the file isn't signed by the Snap Store
 for iface in log-observe system-observe mount-observe; do
   sudo snap connect "maat:$iface"
 done
@@ -161,10 +168,14 @@ maat selftest   # prove the confinement holds on your machine
 maat diagnose   # deterministic report, no AI involved
 ```
 
-`maatctl` lives outside the snap by design. Until it is packaged, build it from the same tree:
+The release's `SHA256SUMS` lists the checksums. To build the snap yourself, run `snapcraft pack` in a checkout; [docs/demo.md](docs/demo.md) has the full walk-through.
+
+`maatctl` lives outside the snap by design. Download it from the same release, or build it with Go 1.26 or later:
 
 ```bash
-go build -o ~/.local/bin/maatctl ./cmd/maatctl
+curl --create-dirs -Lo ~/.local/bin/maatctl "https://github.com/bolesawny7/maat/releases/latest/download/maatctl_linux_$arch"
+chmod +x ~/.local/bin/maatctl
+# or: go install github.com/bolesawny7/maat/cmd/maatctl@latest   (installs to $(go env GOPATH)/bin)
 ```
 
 Connect an MCP client:
@@ -230,6 +241,7 @@ Run it all with `make all race`.
 - [References](docs/references.md): verified facts with sources, and open assumptions with test plans
 - [Roadmap](docs/roadmap.md): milestones and what is done
 - [Evidence](docs/evidence/): captured output from a real Ubuntu VM
+- [Releasing](docs/releasing.md): cutting a release and publishing the snap
 - [maat-bench](bench/README.md): scenarios, scoring and reproducibility
 - [AGENTS.md](AGENTS.md): rules for AI coding agents working on this repository
 

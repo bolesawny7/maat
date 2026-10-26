@@ -6,6 +6,9 @@
 /maatctl
 /harness
 
+# written by the release workflow before it builds the snap
+/VERSION
+
 # snapcraft / craft build dirs
 /parts/
 /stage/
