@@ -11,6 +11,11 @@
   <img src="docs/assets/maatctl-show-hostile-plan.png" alt="maatctl show on a plan written the way a hijacked model would: its hidden terminal escape codes appear as plain text, and its invented evidence ID is flagged NOT ISSUED" width="900">
   <br>
   <sub>A plan written the way a hijacked model would, as <code>maatctl</code> shows it to the person reviewing it: the hidden escape codes appear as text, and the invented evidence ID is flagged.</sub>
+  
+
+https://github.com/user-attachments/assets/988974cd-86c4-4a3f-a3f8-c71f632576f7
+
+
 </p>
 
 *The name: **Ma'at** was the ancient Egyptian principle of truth and balance — the standard a life was weighed against, with the result recorded by Thoth. This tool weighs every proposed change before allowing it, and keeps the record.*
