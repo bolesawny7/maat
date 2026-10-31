@@ -59,7 +59,13 @@ func New(deps *Deps) *mcp.Server {
 	s.AddReceivingMiddleware(identifyWithoutIcons(impl))
 
 	readOnly := func(title string) *mcp.ToolAnnotations {
-		return &mcp.ToolAnnotations{Title: title, ReadOnlyHint: true, OpenWorldHint: ptrFalse()}
+		return &mcp.ToolAnnotations{
+			Title:           title,
+			ReadOnlyHint:    true,
+			DestructiveHint: ptrFalse(),
+			IdempotentHint:  true,
+			OpenWorldHint:   ptrFalse(),
+		}
 	}
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -141,6 +147,7 @@ func New(deps *Deps) *mcp.Server {
 			Title:           "Propose a fix (writes a plan for human review)",
 			ReadOnlyHint:    false,
 			DestructiveHint: ptrFalse(),
+			IdempotentHint:  false,
 			OpenWorldHint:   ptrFalse(),
 		},
 	}, deps.proposeAction)
