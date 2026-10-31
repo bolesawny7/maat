@@ -4,7 +4,7 @@ maat exists to let AI agents look at real machines safely, so security reports a
 
 ## Supported versions
 
-None yet: maat hasn't been released. Once v0.1 ships, the latest release will be supported.
+The latest release is supported. Security fixes are released as patch versions and noted in the release notes.
 
 ## Reporting a vulnerability
 
