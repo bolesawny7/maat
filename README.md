@@ -8,6 +8,10 @@
 <p align="center"><b>Let AI agents troubleshoot Ubuntu machines, with permissions enforced by the kernel instead of the prompt.</b></p>
 
 <p align="center">
+  <a href="https://m8ven.ai/mcp/bolesawny7-maat-dedewq?s=readme"><img src="https://m8ven.ai/badge/mcp/bolesawny7-maat-dedewq?v=2553644a0d59aa8a0772aecf24673109" alt="M8ven Score"></a>
+</p>
+
+<p align="center">
   <img src="docs/assets/maatctl-show-hostile-plan.png" alt="maatctl show on a plan written the way a hijacked model would: its hidden terminal escape codes appear as plain text, and its invented evidence ID is flagged NOT ISSUED" width="900">
   <br>
   <sub>A plan written the way a hijacked model would, as <code>maatctl</code> shows it to the person reviewing it: the hidden escape codes appear as text, and the invented evidence ID is flagged.</sub>
