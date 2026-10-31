@@ -8,7 +8,7 @@
 <p align="center"><b>Let AI agents troubleshoot Ubuntu machines, with permissions enforced by the kernel instead of the prompt.</b></p>
 
 <p align="center">
-  <a href="https://m8ven.ai/mcp/bolesawny7-maat-dedewq?s=readme"><img src="https://m8ven.ai/badge/mcp/bolesawny7-maat-dedewq?v=2553644a0d59aa8a0772aecf24673109" alt="M8ven Score"></a>
+  <a href="https://m8ven.ai/mcp/bolesawny7/maat?s=readme"><img src="https://m8ven.ai/badge/mcp/bolesawny7/maat" alt="M8ven Score"></a>
 </p>
 
 <p align="center">
