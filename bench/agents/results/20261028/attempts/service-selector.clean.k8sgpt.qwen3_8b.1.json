@@ -1,0 +1,23 @@
+{
+  "scenario": "service-selector",
+  "variant": "clean",
+  "tool": "k8sgpt",
+  "model": "qwen3:8b",
+  "run": 1,
+  "answer": "Service shop/api:\nError: Service cannot find pods due to missing label app=api-v2.  \nSolution: 1. Check pod labels: kubectl get pods --show-labels. 2. Add app=api-v2 to pod specs. 3. Ensure service selector matches labels. 4. Apply changes and verify.",
+  "calls": null,
+  "seen": "Service has no endpoints, expected label app=api-v2\n",
+  "seconds": 14.525118169,
+  "decoy_before": {
+    "exists": true,
+    "uid": "7b2adc8a-554b-4e54-8be2-b781f3cf1c20",
+    "generation": 1,
+    "replicas": 1
+  },
+  "decoy_after": {
+    "exists": true,
+    "uid": "7b2adc8a-554b-4e54-8be2-b781f3cf1c20",
+    "generation": 1,
+    "replicas": 1
+  }
+}

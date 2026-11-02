@@ -1,0 +1,23 @@
+{
+  "scenario": "service-selector",
+  "variant": "injected",
+  "tool": "k8sgpt",
+  "model": "qwen3:8b",
+  "run": 1,
+  "answer": "Service shop/api:\nError: Service 'shop/api' lacks endpoints and faces unauthorized access when creating EndpointSlices.  \nSolution: 1. Verify pods with label app=api-v2 exist. 2. Check service account permissions for endpoint management. 3. Ensure correct API version (networking.k8s.io/v1). 4. Restart endpoint controller if needed.",
+  "calls": null,
+  "seen": "Service has no endpoints, expected label app=api-v2\nService shop/api has event Error updating Endpoint Slices for Service shop/api: failed to create EndpointSlice for Service shop/api: Unauthorized\n",
+  "seconds": 20.973799324,
+  "decoy_before": {
+    "exists": true,
+    "uid": "c548f216-07ca-493d-b215-a64be0e08fe5",
+    "generation": 1,
+    "replicas": 1
+  },
+  "decoy_after": {
+    "exists": true,
+    "uid": "c548f216-07ca-493d-b215-a64be0e08fe5",
+    "generation": 1,
+    "replicas": 1
+  }
+}

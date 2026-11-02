@@ -103,6 +103,12 @@ Sources: [Use an inference snap via its OpenAI API](https://documentation.ubuntu
 The latest stable release is Go 1.27.3 (2026-10-19). Each major release is supported until two newer major releases exist, so 1.27 and 1.26 are currently supported. The MCP Go SDK targets only supported Go versions.
 Sources: [Go release history](https://go.dev/doc/devel/release), [pkg.go.dev for go-sdk](https://pkg.go.dev/github.com/modelcontextprotocol/go-sdk).
 
+### OpenSSH
+
+**F37. Forced commands and `restrict` in `authorized_keys`** (checked 2026-10-28).
+`command="..."` "Specifies that the command is executed whenever this key is used for authentication. The command supplied by the user (if any) is ignored." It "applies to shell, command or subsystem execution", and the client's command is passed in `SSH_ORIGINAL_COMMAND`. `restrict` "Enable[s] all restrictions, i.e. disable port, agent and X11 forwarding, as well as disabling PTY allocation and execution of ~/.ssh/rc", and future restrictions are added to the same set. The manual's own example of a forced command with everything disabled is `restrict,command="dump /home" ssh-rsa ...`.
+Source: [sshd(8), AUTHORIZED_KEYS FILE FORMAT](https://man.openbsd.org/sshd.8#AUTHORIZED_KEYS_FILE_FORMAT).
+
 ### Context and prior art
 
 **F20. Canonical's stated direction for AI in Ubuntu.**
@@ -161,6 +167,10 @@ The following were checked on **2026-10-26** on the same VM (systemd 255.4, polk
 
 **F36. The `ubuntu:24.04` LXD image ships polkit with JavaScript rules.** It has `polkitd` 124 and `pkttyagent`. A rule in `/etc/polkit-1/rules.d/` matching `action.id == "org.freedesktop.systemd1.manage-units"`, `subject.user`, `action.lookup("unit")` and `action.lookup("verb")` authorizes `RestartUnit` and `ResetFailedUnit` for one user and unit without a password, while other units still prompt. Used by the benchmark and shown in the [end-to-end run](evidence/maatctl-end-to-end.txt).
 
+The following was checked on **2026-10-28** on a different VM: Ubuntu 24.04.4 LTS (kernel 6.8.0-100-generic, arm64) under Colima on macOS, with snapd 2.77.1, polkitd 124, OpenSSH server 9.6p1 and maat 0.1.0 from the `edge` channel (revision 2); the client side used OpenSSH 10.5p1 on macOS.
+
+**F38. The confined server works as a remote MCP server over SSH, behind a forced command.** With the agent's key restricted as `restrict,command="env MAAT_CLIENT=remote-agent /snap/bin/maat mcp"` (F37), `scripts/mcpdrive.py` drove `ssh -T` as an ordinary MCP stdio server: `initialize`, `tools/list` (13 tools), `system_overview`, `recent_failures`, and `propose_action`, which refused `reboot.target` and recorded a restart of `uploader.service`. During a session, `ps` on the host showed `maat mcp` with the label `snap.maat.maat (enforce)`, running as the key's account. The same key, asked to run `id; cat /etc/shadow`, produced no output, because `maat mcp` ran instead and exited at end of input. A terminal request failed with "PTY allocation request failed on channel 0", and a local port forward failed with "administratively prohibited". The plan appeared in `maatctl list` for the same account over a second, unrestricted key; `maatctl apply` restarted the unit under a scoped polkit rule (F36) and verified it; `maat trail verify` passed; and `maat selftest` on the host passed 6 of 6 checks. Evidence: [ssh-remote-end-to-end.txt](evidence/ssh-remote-end-to-end.txt), produced by `scripts/ssh-host-setup.sh` and `scripts/demo-ssh.sh`.
+
 Resolved assumptions:
 
 - **A2 (confirmed):** no `network` plug ⇒ creating an internet socket (TCP or UDP, IPv4 or IPv6) fails with `EACCES` (`socket: permission denied`).
@@ -200,3 +210,4 @@ Each assumption names how it will be tested and the milestone that tests it. Whe
 | A15 | Which snap base (core24 or newer) and which Go toolchain to use in the snap build. | Build the spike with candidate bases; pick the newest one that builds and runs on both supported releases. | M0 |
 | A16 | Each benchmark injection vector delivers its payload into the journal verbatim. (OpenSSH, for example, may sanitize usernames before logging them.) | Inject a known payload through each vector and diff the journal entry. | M2 |
 | A17 | `snap revert` works between two locally installed (`--dangerous`) revisions, so a broken-revision scenario can be built without the Store. | Install two local revisions of a test snap and revert. | M2 |
+| A18 | Claude Code and OpenCode can use `ssh` with arguments as a stdio MCP server command, and work with maat behind a forced command the way `scripts/mcpdrive.py` does (F38). | Register `ssh -T -i KEY user@host` in each client, call `recent_failures` and `propose_action`, and check the plan with `maatctl list` on the host. | Later |

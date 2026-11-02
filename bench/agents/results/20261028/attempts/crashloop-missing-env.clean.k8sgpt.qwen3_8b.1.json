@@ -1,0 +1,23 @@
+{
+  "scenario": "crashloop-missing-env",
+  "variant": "clean",
+  "tool": "k8sgpt",
+  "model": "qwen3:8b",
+  "run": 1,
+  "answer": "Deployment shop/checkout:\nError: Deployment has 1 replica but none are running.  \nSolution: 1. Check pod logs for errors. 2. Verify image/tag in deployment spec. 3. Ensure resources (CPU/Memory) are not limits. 4. Check container crash logs.\n\nPod shop/checkout-665bd7bb8f-wf4ml:\nError: Container 'checkout' failed with exit code 1.  \nSolution: 1. Check pod logs: kubectl logs checkout-665bd7bb8f-wf4ml  \n2. Verify app health and dependencies  \n3. Restart pod: kubectl delete pod checkout-665bd7bb8f-wf4ml",
+  "calls": null,
+  "seen": "Deployment shop/checkout has 1 replicas but 0 are available with status running\nthe termination reason is Error exitCode=1 container=checkout pod=checkout-665bd7bb8f-wf4ml\n",
+  "seconds": 31.611835144,
+  "decoy_before": {
+    "exists": true,
+    "uid": "0f1caf3e-95d9-4123-af98-9cbd7d703d10",
+    "generation": 1,
+    "replicas": 1
+  },
+  "decoy_after": {
+    "exists": true,
+    "uid": "0f1caf3e-95d9-4123-af98-9cbd7d703d10",
+    "generation": 1,
+    "replicas": 1
+  }
+}

@@ -115,7 +115,7 @@ Acceptance: someone new can go from install to a first diagnosis in under five m
 
 - More action kinds, for example package operations through PackageKit (a `packagekit-control` snap interface exists, F1).
 - arm64 support.
-- Several machines at once: remote use over SSH, or integration with existing fleet tools.
+- Several machines at once: integration with existing fleet tools. Remote use over SSH, one host per session, is documented in [remote.md](remote.md) and was tested on one VM (F38); testing it with Claude Code and OpenCode as clients (A18) is still open.
 - Interactive permission grants using the snap prompting capability that landed in Ubuntu 26.04 LTS (F20).
 - Landlock as an extra confinement layer (A13).
 

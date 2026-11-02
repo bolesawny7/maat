@@ -22,6 +22,7 @@ Out of scope: root, kernel exploits, a compromised MCP client, and a compromised
 | Boundary | What crosses it | What enforces it |
 |---|---|---|
 | Model and server | Tool calls in, condensed data out | The MCP client, then maat's schema validation |
+| Agent machine and host (remote use) | MCP over SSH | `sshd`: a forced command and `restrict` on the agent's key (F37, F38); then everything below |
 | Server and host | Reads only | AppArmor and seccomp, through snap interfaces (F1, F2, F3) |
 | Server and plan store | Plan files | File permissions; `maatctl` validates everything again and trusts nothing the server wrote |
 | You and `maatctl` | Confirmation | The controlling terminal (`/dev/tty`) |
@@ -36,6 +37,7 @@ maat secures its own tools, not the rest of your MCP client. If the client also 
 - Run `maatctl` yourself, in your own terminal, never through the agent. Its confirmation reads the controlling terminal, which stops a piped answer, but a shell tool that allocates a pseudo-terminal could still type one.
 - Run `maat mcp` as your own user, not root (it refuses root).
 - On machines with sensitive data, use a local model.
+- For [remote use over SSH](remote.md), give the agent its own key that can only start `maat mcp` (`restrict,command=...`), on the account whose plans you review, and pin the host keys (T11).
 
 ## Threats and mitigations
 
@@ -114,6 +116,18 @@ A plan's rationale, a log line or a unit description can carry ANSI escape seque
 
 - `maatctl` and `maat diagnose` print every untrusted string through one function that escapes C0 and C1 control characters, bidirectional and zero-width format characters, and invalid bytes (`internal/termsafe`, fuzz-tested). The [end-to-end evidence](evidence/maatctl-end-to-end.txt) shows a hostile rationale rendered harmless.
 - Plan text is bounded: at most 4,000 bytes of rationale and 32 evidence IDs of the form `ev_…`.
+
+### T11. Remote use: the agent's SSH key, or the machine holding it, is compromised
+
+In [remote use](remote.md), the MCP client and the model run on another machine and start `maat mcp` on each host over SSH. A compromised client is out of scope above, but in this layout its reach is set by the key, so this section says what that reach is.
+
+- The key can only start `maat mcp`. `sshd` ignores the command the client asks for and refuses terminals and every kind of forwarding (F37). On a VM, the key couldn't run another command, get a terminal or forward a port (F38).
+- On the host, the server it starts is the confined one, with the same plugs and no network (F38), so T1 to T3 apply unchanged.
+- The confined server can't write the account's files, so it can't edit `authorized_keys` to lift its own restriction (the self-test's `home_write_blocked` check, F38).
+- Plans still need a person on each host: `maatctl` runs there, checks everything from scratch (T4) and asks polkit (T6).
+- Pinned host keys stop a machine in the middle from posing as a host and feeding the agent invented data.
+
+**Residual risk:** whoever holds the key can read what maat's tools return on every host it reaches. That's redacted and condensed, but still sensitive (T2). They can also file plans and trail records without limit, because the plan store has no cap yet. That fills the reviewer's queue and the disk, and wastes review attention (T6). The same is true of a hijacked model in local use.
 
 ## Security invariants
 

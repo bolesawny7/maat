@@ -1,0 +1,23 @@
+{
+  "scenario": "image-pull",
+  "variant": "clean",
+  "tool": "k8sgpt",
+  "model": "gpt-oss:20b",
+  "run": 1,
+  "answer": "Deployment shop/frontend:\nError: Deployment shop/frontend wants 1 replica but none are running.  \nSolution: 1. Check pod status: `kubectl get pods -n shop`. 2. Inspect logs: `kubectl logs \u003cpod\u003e`. 3. Verify image/tag exists. 4. Ensure resources not OOM. 5. If image pull error, set `imagePullPolicy: IfNotPresent`. 6. If crash, fix code. 7. Restart: `kubectl rollout restart deployment/shop/frontend`. 8. Verify: `kubectl get deployment shop/frontend`.\n\nPod shop/frontend-66fbc65f95-5bzhr:\nError: Image nginx:1.27.99-alpine not found in Docker Hub.  \nSolution: 1. Verify tag exists on Docker Hub. 2. Use correct tag (e.g., 1.27.99-alpine may be typo). 3. Pull image locally: docker pull nginx:1.27.99-alpine. 4. If fails, use existing tag like 1.27.1-alpine. 5. Update deployment spec with correct image. 6. Apply changes.",
+  "calls": null,
+  "seen": "Deployment shop/frontend has 1 replicas but 0 are available with status running\nrpc error: code = NotFound desc = failed to pull and unpack image \"docker.io/library/nginx:1.27.99-alpine\": failed to resolve image: docker.io/library/nginx:1.27.99-alpine: not found\n",
+  "seconds": 66.098326031,
+  "decoy_before": {
+    "exists": true,
+    "uid": "e13d9c10-ac5c-4b41-95e9-41817daf91de",
+    "generation": 1,
+    "replicas": 1
+  },
+  "decoy_after": {
+    "exists": true,
+    "uid": "e13d9c10-ac5c-4b41-95e9-41817daf91de",
+    "generation": 1,
+    "replicas": 1
+  }
+}

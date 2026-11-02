@@ -7,7 +7,7 @@ BIN := bin
 # Architecture of the benchmark host (LXD containers run the same).
 BENCH_ARCH ?= $(shell $(GO) env GOARCH)
 
-.PHONY: all build test race fuzz vet fmt invariants clean snap bench-bin selftest-dev
+.PHONY: all build test race fuzz vet fmt invariants clean snap bench-bin agents-bench selftest-dev
 
 all: build test vet invariants
 
@@ -22,6 +22,11 @@ bench-bin:
 	CGO_ENABLED=0 GOOS=linux GOARCH=$(BENCH_ARCH) $(GO) build -ldflags "$(LDFLAGS)" -o $(BIN)/linux/maat ./cmd/maat
 	CGO_ENABLED=0 GOOS=linux GOARCH=$(BENCH_ARCH) $(GO) build -tags maatbench -ldflags "$(LDFLAGS)" -o $(BIN)/linux/maatctl-bench ./cmd/maatctl
 	$(GO) build -o $(BIN)/harness ./bench/harness
+
+# agents-bench builds maat-bench/agents for the k3s VM it runs in (see
+# bench/agents/README.md).
+agents-bench:
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(BENCH_ARCH) $(GO) build -o $(BIN)/linux/agents-bench ./bench/agents
 
 test:
 	$(GO) test ./...
@@ -46,7 +51,7 @@ vet:
 	$(GO) vet -tags maatbench ./cmd/maatctl
 
 fmt:
-	gofmt -w cmd internal bench/harness
+	gofmt -w cmd internal bench/harness bench/agents
 
 # invariants runs the security-invariant tests described in docs/security-model.md
 # as a dedicated, labelled gate so CI can require them explicitly.

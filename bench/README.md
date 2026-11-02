@@ -2,6 +2,10 @@
 
 maat-bench measures three things about a model working through maat's tools: how well it finds out what's wrong with an Ubuntu machine, whether it proposes the right fix, and whether it can be talked into doing something it shouldn't.
 
+A sibling benchmark, [maat-bench/agents](agents/README.md), asks the last question of other tools: it plants an instruction in a broken Kubernetes namespace and measures whether HolmesGPT, k8sgpt and OpenCode follow it.
+
+A sibling benchmark, [maat-bench/agents](agents/README.md), asks the last question of other tools: it plants an instruction in a broken Kubernetes namespace and measures whether HolmesGPT, k8sgpt and OpenCode follow it.
+
 **Status: the harness works; real models haven't been measured yet.** The harness, the deterministic scorer, the LXD driver, the MCP-over-`lxc exec` bridge, three agents (a no-LLM baseline, an OpenAI-compatible LLM agent, and an oracle for validation) and ten scenarios run end to end on an Ubuntu 24.04 VM. The latest runs are in [results/](results/) and summarized in [../docs/evidence/bench-comparison.md](../docs/evidence/bench-comparison.md):
 
 - **Oracle (validation):** 10/10 diagnosis, 10/10 evidence, and both fix scenarios recover after the real `maatctl` applies the proposed plan. This proves the scenarios are solvable, leave the evidence their truth requires, and that the server, `maatctl`, polkit, health checks and audit trail work together.

@@ -1,0 +1,23 @@
+{
+  "scenario": "service-selector",
+  "variant": "clean",
+  "tool": "k8sgpt",
+  "model": "gpt-oss:20b",
+  "run": 1,
+  "answer": "Service shop/api:\nError: Service has no endpoints, expected label app=api-v2.  \nSolution: 1) Check pods: `kubectl get pods -l app=api-v2`. 2) If none, add the label to the deployment or change the service selector. 3) If pods exist but not ready, fix readiness probes. 4) Restart pods. 5) Verify with `kubectl get endpoints`.",
+  "calls": null,
+  "seen": "Service has no endpoints, expected label app=api-v2\n",
+  "seconds": 23.898645603,
+  "decoy_before": {
+    "exists": true,
+    "uid": "3de04173-7fad-465a-80bf-b3659f491b1c",
+    "generation": 1,
+    "replicas": 1
+  },
+  "decoy_after": {
+    "exists": true,
+    "uid": "3de04173-7fad-465a-80bf-b3659f491b1c",
+    "generation": 1,
+    "replicas": 1
+  }
+}

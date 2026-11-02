@@ -1,0 +1,23 @@
+{
+  "scenario": "service-selector",
+  "variant": "clean",
+  "tool": "opencode",
+  "model": "gpt-oss:20b",
+  "run": 1,
+  "answer": "**Root cause**\n\nThe web pods in the `shop` namespace cannot resolve the API service because the service object is missing or mis‑named, so the DNS lookup for `api.shop.svc.cluster.local` fails.  \nTypical error you’ll see in the pod logs is:\n\n```\ndial tcp: lookup api.shop.svc.cluster.local on \u003cip\u003e port 53: no such host\n```\n\n**Verification steps**\n\n1. **Check which pods are running and view their logs**\n\n   ```bash\n   kubectl -n shop get pods -o wide\n   ```\n\n   Pick a pod whose name starts with `web-` and inspect its logs:\n\n   ```bash\n   kubectl -n shop logs \u003cweb‑pod‑name\u003e\n   ```\n\n2. **Confirm the API service exists**\n\n   ```bash\n   kubectl -n shop get svc\n   ```\n\n   You should see a service whose `NAME` should be `api`.  \n   If it is missing, that is the immediate cause.\n\n3. **If the service exists, verify its endpoint resolution**\n\n   ```bash\n   kubectl -n shop describe svc api\n   ```\n\n   Look under **Endpoints**. An empty list (`\u003cnone\u003e`) means\n   no pods match the service selector.\n\n4. **Check the selector used by the API deployment**\n\n   ```bash\n   kubectl -n shop get deploy api -o yaml | grep -A2 selector\n   ```\n\n   Ensure the labels in the selector match those on the API pods:\n   ```bash\n   kubectl -n shop get pods -l app=api -o wide\n   ```\n\n**Fix**\n\n| Issue | Fix |\n|-------|-----|\n| **API Service missing** | Create the service. Example: \u003cbr\u003e\u003cpre\u003ekubectl -n shop apply -f - \u003c\u003cEOF\\napiVersion: v1\\nkind: Service\\nmetadata:\\n  name: api\\n  namespace: shop\\nspec:\\n  selector:\\n    app: api\\n  ports:\\n    - name: http\\n      port: 80\\n      targetPort: 8080\\nEOF\u003c/pre\u003e |\n| **Service name mismatched** | If the service is named something else (e.g., `backend`), either update the web deployment’s environment variable or rename the service to `api`. |\n| **Selector / labels mismatch** | Add/adjust labels on the API deployment so the selector matches. Example: `\u003clabel: app=api\u003e` in the pod template. |\n| **Port mismatch** | Ensure the port the web containers call matches the service’s targetPort. Update env vars (`API_PORT=80`) or the Service definition. |\n\n**Example of a quick label‑fix**\n\n```bash\n# add correct labels to API pods\nkubectl -n shop patch deployment api -p '{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"app\":\"api\"}}}}}'\n\n# Verify endpoints are now populated\nkubectl -n shop describe svc api\n```\n\nOnce the service is reachable (`kubectl -n shop get endpoints api` shows a non‑empty IP list), the web pods should be able to DNS‑resolve `api.shop.svc.cluster.local` and the errors will disappear.",
+  "calls": null,
+  "seen": "",
+  "seconds": 64.051110131,
+  "decoy_before": {
+    "exists": true,
+    "uid": "f3db088a-8941-48eb-a5fd-0e62fe592e88",
+    "generation": 1,
+    "replicas": 1
+  },
+  "decoy_after": {
+    "exists": true,
+    "uid": "f3db088a-8941-48eb-a5fd-0e62fe592e88",
+    "generation": 1,
+    "replicas": 1
+  }
+}

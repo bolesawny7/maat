@@ -1,6 +1,6 @@
 # Evidence
 
-Captured output from running maat on an Ubuntu 24.04.3 LTS VM (kernel 6.8, arm64; systemd 255.4, polkitd 124, snapd 2.77.1), so the claims in the README and security model can be checked rather than taken on trust. Everything here was produced by code and scripts in this repository on 2026-10-26. One edit was made after capture: the VM's mount of the developer's project directory was renamed to `/Users/dev/maat`.
+Captured output from running maat on an Ubuntu 24.04.3 LTS VM (kernel 6.8, arm64; systemd 255.4, polkitd 124, snapd 2.77.1), so the claims in the README and security model can be checked rather than taken on trust. Everything here was produced by code and scripts in this repository on 2026-10-26, except the SSH run, which comes from a second VM on 2026-10-28 (described below). One edit was made after capture: the VM's mount of the developer's project directory was renamed to `/Users/dev/maat`.
 
 ## Confinement: `selftest-confined.txt` / `.json`
 
@@ -28,6 +28,17 @@ The output of [scripts/demo-e2e.sh](../../scripts/demo-e2e.sh): the confined ser
 4. With no polkit rule, `apply` brings up polkit's text prompt on the terminal; a wrong password fails the execution, and the plan is marked `failed`.
 5. With a polkit rule scoped to one unit and one verb, `apply` runs without a password, and verification passes even though systemd unloaded the unit (F35).
 6. `maat trail verify` passes, with every journal checkpoint matching. Its warnings are real: earlier test runs on the same VM left checkpoints of trails that were since deleted. After the newest three records are deleted, it reports the truncation.
+
+## Remote use over SSH: `ssh-remote-end-to-end.txt`
+
+Captured on 2026-10-28 on a different VM: Ubuntu 24.04.4 LTS (kernel 6.8.0-100-generic, arm64) under Colima on macOS, with snapd 2.77.1, polkitd 124, OpenSSH server 9.6p1, and maat 0.1.0 installed from the `edge` channel (revision 2). The host was prepared by [scripts/ssh-host-setup.sh](../../scripts/ssh-host-setup.sh), and the output is from [scripts/demo-ssh.sh](../../scripts/demo-ssh.sh), run on the Mac. The SSH address is `127.0.0.1` because Colima forwards the VM's SSH port to the Mac. See [remote.md](../remote.md) and F38. In order:
+
+1. The agent's key (`restrict,command="... maat mcp"`) asks for `id; cat /etc/shadow` and gets no output, because `maat mcp` runs instead. A terminal request and a port forward are both refused by `sshd`.
+2. An MCP session over `ssh -T` lists the 13 tools, reads the overview and the failed units: the deliberately broken `uploader.service`, plus the VM's own `cloud-final.service`, which really did fail under Colima.
+3. During a session, `ps` on the host shows `maat mcp` under `snap.maat.maat (enforce)`.
+4. Over SSH, `propose_action` refuses `reboot.target` and records a restart of `uploader.service` that cites the log line.
+5. Over the second, unrestricted key, the same account's `maatctl` lists, shows, applies and verifies the plan under a polkit rule scoped to that unit and verb. `maat trail verify` passes. Its warning is real: an earlier run of the same demo on this VM left journal checkpoints of a trail that was then deleted before this run.
+6. `maat selftest` on the host passes 6 of 6 checks, including `network_blocked` and `home_write_blocked`.
 
 ## Benchmark: `bench-comparison.md`, `bench-baseline-summary.md`, `bench-oracle-summary.md`
 
