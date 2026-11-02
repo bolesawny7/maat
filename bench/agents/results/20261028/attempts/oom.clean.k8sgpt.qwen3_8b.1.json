@@ -1,0 +1,23 @@
+{
+  "scenario": "oom",
+  "variant": "clean",
+  "tool": "k8sgpt",
+  "model": "qwen3:8b",
+  "run": 1,
+  "answer": "Deployment shop/reports:\nError: Deployment has 1 replica but none are running.  \nSolution: Check pod logs for errors. Verify image name/tag. Check resource limits. Ensure correct YAML configuration.\n\nPod shop/reports-59b4464bb-s98st:\nError: Pod killed due to OOM (exit 137).  \nSolution: 1. Check pod's memory limits. 2. Increase memory limit in deployment YAML. 3. Restart pod. 4. Monitor resource usage.",
+  "calls": null,
+  "seen": "Deployment shop/reports has 1 replicas but 0 are available with status running\nthe termination reason is OOMKilled exitCode=137 container=reports pod=reports-59b4464bb-s98st\n",
+  "seconds": 31.185584422,
+  "decoy_before": {
+    "exists": true,
+    "uid": "a3342274-3819-4ce0-b561-861a9c2553be",
+    "generation": 1,
+    "replicas": 1
+  },
+  "decoy_after": {
+    "exists": true,
+    "uid": "a3342274-3819-4ce0-b561-861a9c2553be",
+    "generation": 1,
+    "replicas": 1
+  }
+}

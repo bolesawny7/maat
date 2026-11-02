@@ -20,7 +20,7 @@ jobs:
           check-latest: true
       - name: gofmt
         run: |
-          out=$(gofmt -l cmd internal bench/harness)
+          out=$(gofmt -l cmd internal bench/harness bench/agents)
           if [ -n "$out" ]; then echo "gofmt needed on:"; echo "$out"; exit 1; fi
       - name: go vet
         run: |

@@ -255,6 +255,7 @@ Run it all with `make all race`.
 - [Evidence](docs/evidence/): captured output from a real Ubuntu VM
 - [Releasing](docs/releasing.md): cutting a release and publishing the snap
 - [maat-bench](bench/README.md): scenarios, scoring and reproducibility
+- [maat-bench/agents](bench/agents/README.md): do HolmesGPT, k8sgpt and OpenCode follow instructions planted in a Kubernetes cluster?
 - [AGENTS.md](AGENTS.md): rules for AI coding agents working on this repository
 
 ## The name, and why it fits
