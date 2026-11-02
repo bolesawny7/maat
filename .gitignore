@@ -19,6 +19,10 @@
 # Personal launch kit (marketing copy, graphics) — not part of the project
 /launch/
 
+# maat-bench/agents: readable transcripts repeat attempts/*.json, so only the
+# records are committed
+/bench/agents/results/*/transcripts/
+
 # Go
 *.test
 *.out
