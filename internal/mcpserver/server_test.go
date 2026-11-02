@@ -88,6 +88,36 @@ func TestToolsAreRegisteredAndReadOnly(t *testing.T) {
 	}
 }
 
+// Some MCP directories reject a tool unless all four hints are present as
+// booleans, so check them as clients receive them.
+func TestEveryToolDeclaresAllFourHints(t *testing.T) {
+	cs, done := connect(t, testDeps(t))
+	defer done()
+
+	res, err := cs.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range res.Tools {
+		data, err := json.Marshal(tool.Annotations)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var hints map[string]any
+		if err := json.Unmarshal(data, &hints); err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range []string{"readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"} {
+			if _, ok := hints[key].(bool); !ok {
+				t.Errorf("tool %q: %s is %v, want a boolean", tool.Name, key, hints[key])
+			}
+		}
+		if hints["destructiveHint"] != false || hints["openWorldHint"] != false {
+			t.Errorf("tool %q: maat's tools are never destructive or open-world, got %v", tool.Name, hints)
+		}
+	}
+}
+
 func TestProposeActionWritesPlanAndTrail(t *testing.T) {
 	deps := testDeps(t)
 	cs, done := connect(t, deps)
