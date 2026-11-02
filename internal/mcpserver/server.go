@@ -34,8 +34,6 @@ type Deps struct {
 	evidence *evidenceLog
 }
 
-func ptrFalse() *bool { b := false; return &b }
-
 // New builds an MCP server with all of maat's tools registered.
 func New(deps *Deps) *mcp.Server {
 	if deps.Redactor == nil {
@@ -58,86 +56,150 @@ func New(deps *Deps) *mcp.Server {
 
 	s.AddReceivingMiddleware(identifyWithoutIcons(impl))
 
-	readOnly := func(title string) *mcp.ToolAnnotations {
-		return &mcp.ToolAnnotations{
-			Title:           title,
-			ReadOnlyHint:    true,
-			DestructiveHint: ptrFalse(),
-			IdempotentHint:  true,
-			OpenWorldHint:   ptrFalse(),
-		}
-	}
-
+	// Each tool spells out all four hints instead of sharing a helper, so that
+	// directories which read annotations from the source can see them.
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "system_overview",
 		Description: "High-level health of the host: OS, kernel, uptime, load, memory, and how many systemd units have failed.",
-		Annotations: readOnly("System overview"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "System overview",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.systemOverview)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_units",
 		Description: "List systemd units, optionally only the failed ones.",
-		Annotations: readOnly("List units"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "List units",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.listUnits)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "unit_status",
 		Description: "Detailed status of one systemd unit: load/active/sub state, result, last exit code, restart count.",
-		Annotations: readOnly("Unit status"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Unit status",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.unitStatus)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "recent_failures",
 		Description: "One call that returns every failed systemd unit with its status (load state, result, exit code, restart count) and a short redacted log tail. The most efficient starting point for a diagnosis.",
-		Annotations: readOnly("Recent failures"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Recent failures",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.recentFailures)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "journal_summary",
 		Description: "Clustered summary of journal log templates with counts, time range, severity, and a redacted example per template. Prefer this over raw entries; it fits far more signal in the context window.",
-		Annotations: readOnly("Journal summary"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Journal summary",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.journalSummary)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "journal_entries",
 		Description: "The most recent raw journal entries (redacted), filtered by unit, severity, and time, trimmed to a budget.",
-		Annotations: readOnly("Journal entries"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Journal entries",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.journalEntries)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "kernel_messages",
 		Description: "Recent kernel ring-buffer messages (redacted), summarized into templates.",
-		Annotations: readOnly("Kernel messages"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Kernel messages",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.kernelMessages)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "apparmor_denials",
 		Description: "AppArmor DENIED events, parsed and de-duplicated with counts. Useful when a service fails for no obvious reason.",
-		Annotations: readOnly("AppArmor denials"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "AppArmor denials",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.apparmorDenials)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "network_state",
 		Description: "Network interfaces with traffic counters, and addresses and routes where they can be read (not under maat's strict snap; the result says so).",
-		Annotations: readOnly("Network state"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Network state",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.networkState)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "listening_sockets",
 		Description: "Listening TCP and bound UDP sockets, with the owning process when it can be resolved. Returns an error, never an empty list, when the socket tables can't be read (as under maat's strict snap).",
-		Annotations: readOnly("Listening sockets"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Listening sockets",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.listeningSockets)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "disk_usage",
 		Description: "Space and inode usage per real filesystem, as the host sees it, writable and fullest first.",
-		Annotations: readOnly("Disk usage"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Disk usage",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.diskUsage)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "top_processes",
 		Description: "Processes using the most CPU and memory, sampled over a short interval.",
-		Annotations: readOnly("Top processes"),
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Top processes",
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(false),
+		},
 	}, deps.topProcesses)
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -146,9 +208,9 @@ func New(deps *Deps) *mcp.Server {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Propose a fix (writes a plan for human review)",
 			ReadOnlyHint:    false,
-			DestructiveHint: ptrFalse(),
+			DestructiveHint: new(false),
 			IdempotentHint:  false,
-			OpenWorldHint:   ptrFalse(),
+			OpenWorldHint:   new(false),
 		},
 	}, deps.proposeAction)
 
