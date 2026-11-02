@@ -1,0 +1,113 @@
+
+$ ssh -i agent_key ops@127.0.0.1 'id; cat /etc/shadow'    # the agent key asks for a shell command
+exit status 0 and no output: sshd ran the forced command (maat mcp), which saw end of input and exited
+
+$ ssh -tt -i agent_key ops@127.0.0.1    # ask for a terminal
+PTY allocation request failed on channel 0
+
+$ ssh -N -L 18081:127.0.0.1:8081 -i agent_key ops@127.0.0.1; curl http://127.0.0.1:18081/    # ask for a port forward
+curl: (56) Recv failure: Connection reset by peer
+channel 2: open failed: administratively prohibited: open failed
+
+$ mcpdrive.py look.jsonl ssh -T -i agent_key ops@127.0.0.1    # an MCP session over SSH
+server: maat 0.1.0
+tools: apparmor_denials disk_usage journal_entries journal_summary kernel_messages list_units listening_sockets network_state propose_action recent_failures system_overview top_processes unit_status
+system_overview: Ubuntu 24.04.4 LTS, kernel 6.8.0-100-generic, 2 failed units
+recent_failures:
+  ev_ecf5816d cloud-final.service (failed)
+    ev_8bb9c43c 3072 SHA256:kQan3OziDoMn4vfJyqqRrAUfUExIlixAxmNDAU8d4Vc root@lima-colima-maat-ssh (RSA)
+    ev_f15c299a Cloud-init v. 25.3-0ubuntu1~24.04.1 finished at Wed, 28 Oct 2026 13:39:41 +0000. Datasource DataSourceNoCloud 
+    ev_1adf780b cloud-final.service: Main process exited, code=exited, status=1/FAILURE
+    ev_c1d32d7e cloud-final.service: Failed with result 'exit-code'.
+    ev_5fd13f27 Failed to start cloud-final.service - Cloud-init: Final Stage.
+  ev_3249b2ad uploader.service (failed)
+    ev_a165b3eb Starting uploader.service - Report uploader...
+    ev_ac4e216f curl: (7) Failed to connect to 127.0.0.1 port 8081 after 0 ms: Couldn't connect to server
+    ev_1a52e91d uploader.service: Main process exited, code=exited, status=7/NOTRUNNING
+    ev_0630f197 uploader.service: Failed with result 'exit-code'.
+    ev_4ad5cdd7 Failed to start uploader.service - Report uploader.
+
+$ ps -o label,user,args -u $USER    # on the host, during an agent session (human key)
+snap.maat.maat (enforce)        ops      /snap/maat/2/bin/maat mcp
+
+$ mcpdrive.py propose.jsonl ssh -T -i agent_key ops@127.0.0.1    # propose over SSH
+  id 3: error: action "service.restart" parameter "unit": only .service units are accepted by this action
+  id 4: ok: Recorded plan 01a182c2-b112-7034-af01-b276a0102098 for human review. The system has not been changed.
+
+$ ssh -i human_key ops@127.0.0.1 maatctl list
+PLAN ID                               KIND                  STATUS       PARAMS
+01a182c2-b112-7034-af01-b276a0102098  service.restart       pending      map[unit:uploader.service]
+
+$ ssh -i human_key ops@127.0.0.1 maatctl show 01a182c2-b112-7034-af01-b276a0102098
+Plan:       01a182c2-b112-7034-af01-b276a0102098
+Status:     pending
+Digest:     sha256:ccd5cd388bf5dc7443bd051af48afaa78748f627c6fc055eef639437d4901096 (matches the proposal record)
+Action:     service.restart  (Restart a failed systemd service)
+Danger:     medium
+Parameters: map[unit:uploader.service]
+Proposed:   2026-10-28T13:45:59Z by remote-agent
+Rationale (written by the model; treat it as a claim, not a fact):
+  uploader failed to connect to its backend, which is running now; a restart should succeed.
+Evidence (1 cited; excerpts as recorded by the confined server, redacted):
+  - ev_ac4e216f  [journal uploader.service] curl: (7) Failed to connect to 127.0.0.1 port 8081 after 0 ms: Couldn't connect to server
+
+Preconditions (1):
+  - unit.active_state(uploader.service) == failed
+Verification (1):
+  - unit.active_state(uploader.service) == active
+Rollback:   none — A restart leaves no persistent on-disk change to undo; failure is surfaced by the verification step.
+
+Apply with:  maatctl apply 01a182c2-b112-7034-af01-b276a0102098
+
+$ ssh -i human_key ops@127.0.0.1 maatctl apply 01a182c2-b112-7034-af01-b276a0102098    # typed confirmation; the scoped polkit rule authorizes it
+  01a182c2-b112-7034-af01-b276a0102098
+> 01a182c2-b112-7034-af01-b276a0102098
+  [ok] unit.active_state(uploader.service) == failed (actual: failed)
+Applying (polkit may ask for administrator authentication)...
+Verifying...
+  [ok] unit.active_state(uploader.service) == active (actual: active)
+
+Done. Plan 01a182c2-b112-7034-af01-b276a0102098 applied and verified.
+
+$ ssh -i human_key ops@127.0.0.1 systemctl is-active uploader.service
+active
+
+$ ssh -i human_key ops@127.0.0.1 maat trail verify
+Trail: /home/ops/snap/maat/common/trail/trail.jsonl
+Records: 4
+Chain OK: true
+Journal checkpoints checked: 4 (OK: true)
+  warning: the journal holds 4 checkpoint(s) of trail 3f4cccd141 that is not this file (up to record 4). This is expected if maat's data was reset, for example by removing and reinstalling the snap; otherwise this trail file may have been replaced.
+
+$ ssh -i human_key ops@127.0.0.1 maat selftest    # the same confinement the agent's sessions run under
+maat self-test — confined in snap maat
+
+[PASS] not_root
+       expect: maat runs as a normal user, so file permissions back up the confinement
+       observed: running as uid 1000
+[PASS] journal_readable
+       expect: maat can read the system journal
+       observed: read 1 entry/entries from the journal
+[PASS] units_listable
+       expect: maat can list systemd units over D-Bus
+       observed: listed 417 units
+[PASS] network_blocked
+       expect: the server cannot create internet sockets (TCP or UDP, IPv4 or IPv6)
+       observed: refused by policy: tcp4: dial tcp4 127.0.0.1:9: socket: permission denied; tcp6: dial tcp6 [::1]:9: socket: permission denied; udp4: dial udp4 127.0.0.1:9: socket: permission denied
+[PASS] home_write_blocked
+       expect: the server cannot write the user's files
+       observed: write to /home/ops was refused: open /home/ops/.maat-selftest-probe-4974: permission denied
+[PASS] systemd_control_denied
+       expect: AppArmor stops the server from restarting systemd units
+       observed: refused by AppArmor: An AppArmor policy prevents this sender from sending this message to this recipient; type="method_call", sender=":1.115" (uid=1000 pid=4974 comm="/snap/maat/2/bin/maat selftest" label="snap.maat.maat (enforce)") interface="org.freedesktop.systemd1.Manager" member="RestartUnit" error name="(unset)" requested_reply="0" destination="org.freedesktop.systemd1" (uid=0 pid=1 comm="/sbin/init" label="unconfined")
+[INFO] disk_view
+       expect: informational: disk_usage sees the host's filesystems
+       observed: yes: 10 filesystems; / is ext4 on /dev/root, 8.9% used
+[INFO] network_state
+       expect: informational: what network_state can read
+       observed: interface names and counters only (2 interfaces); addresses and routes need network-observe, which maat does not use
+[INFO] listening_sockets
+       expect: informational: whether listening sockets can be read from /proc/net
+       observed: no (the tool fails closed with an explanation)
+
+6 passed, 0 failed, 3 informational

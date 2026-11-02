@@ -196,6 +196,8 @@ opencode mcp add maat -- maat mcp   # OpenCode
 
 To keep everything on your machine, use a local model from an inference snap. Its `status` command prints an OpenAI-compatible endpoint (for example `http://localhost:8336/v1` for `gemma4`), and Canonical documents [how to use one with OpenCode](https://documentation.ubuntu.com/inference-snaps/how-to/integration/opencode/).
 
+The client and the model don't have to run on the machine itself. One agent, with a hosted model or a single inference machine, can reach maat on many hosts over SSH, using a key that can only start `maat mcp`: see [Remote use over SSH](docs/remote.md).
+
 When the agent proposes a fix, you review and apply it yourself, in your own terminal:
 
 ```bash
@@ -213,7 +215,7 @@ maat trail verify
 - **Redaction is pattern-based** and will miss some secrets. With a hosted model, condensed log data leaves the machine; use a local model for sensitive hosts.
 - **maat can't take a shell away from your MCP client.** If the client also gives the model a shell, the model can do whatever that shell allows. See [deployment assumptions](docs/security-model.md#deployment-assumptions).
 - **The trail detects tampering; it doesn't prevent it.** Root can rewrite anything, and replacing the whole trail file is reported as a warning, because it can't be told apart from a reinstall.
-- **One machine at a time,** Ubuntu 24.04 tested (arm64), 26.04 not yet.
+- **One machine per session.** [Remote use over SSH](docs/remote.md) reaches one host per MCP session and has been tested on one VM so far. Ubuntu 24.04 tested (arm64), 26.04 not yet.
 
 ## Principles
 
@@ -227,7 +229,7 @@ maat trail verify
 ## Non-goals
 
 - **A sandbox for coding agents.** Use Workshop for that.
-- **Fleet management.** v0 works on the local machine only.
+- **Fleet management.** maat reaches one machine per session, locally or over SSH. It doesn't aggregate results or orchestrate fleets.
 - **Protection against root or kernel exploits.** maat relies on the kernel and on root being trustworthy.
 - **Active network probes.** The confined server never makes network connections, not even pings or DNS lookups, because the permission that allows them would also let data leave the machine.
 
@@ -247,6 +249,7 @@ Run it all with `make all race`.
 
 - [Architecture](docs/architecture.md): components, data flow, plans, the trail and key decisions
 - [Security model](docs/security-model.md): threats, trust boundaries and the invariants enforced in CI
+- [Remote use over SSH](docs/remote.md): one agent and model for many hosts, with a key that can only start maat
 - [References](docs/references.md): verified facts with sources, and open assumptions with test plans
 - [Roadmap](docs/roadmap.md): milestones and what is done
 - [Evidence](docs/evidence/): captured output from a real Ubuntu VM
