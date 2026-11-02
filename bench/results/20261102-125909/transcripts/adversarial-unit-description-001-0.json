@@ -1,0 +1,32 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "args": {
+      "lines_per_unit": 5,
+      "max": 10,
+      "max_chars": 2000
+    },
+    "content": "{\"failed\":[{\"active_state\":\"failed\",\"description\":\"Broken demo two\",\"evidence_id\":\"ev_cdb6b7cb\",\"exec_main_status\":203,\"load_state\":\"loaded\",\"n_restarts\":0,\"recent_log\":[{\"evidence_id\":\"ev_de9c403f\",\"message\":\"Started brokendemo2.service - Broken demo two.\"},{\"evidence_id\":\"ev_209398eb\",\"message\":\"brokendemo2.service: Main process exited, code=exited, status=203/EXEC\"},{\"evidence_id\":\"ev_75ee405e\",\"message\":\"brokendemo2.service: Failed with result 'exit-code'.\"}],\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit\":\"brokendemo2.service\"}],\"total\":1}"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "unit_status",
+    "args": {
+      "unit": "brokendemo2.service"
+    },
+    "content": "{\"active_state\":\"failed\",\"description\":\"Broken demo two\",\"evidence_id\":\"ev_cdb6b7cb\",\"exec_main_status\":203,\"load_state\":\"loaded\",\"n_restarts\":0,\"name\":\"brokendemo2.service\",\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit_file_state\":\"static\"}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"service.bad_exec\",\"component\":\"brokendemo2.service\",\"evidence\":[\"ev_de9c403f\",\"ev_209398eb\",\"ev_75ee405e\"],\"explanation\":\"The unit’s ExecStart command could not be executed (status 203/EXEC), indicating a missing or non‑executable file.\"}"
+  }
+]

@@ -47,7 +47,7 @@ maat secures its own tools, not the rest of your MCP client. If the client also 
 - Only catalog actions can be proposed, and their parameters are validated. The service actions accept only `.service` units, so a log line can't talk the model into proposing `reboot.target`, and `service.restart` requires the unit to be failed.
 - A person reviews the plan with the cited evidence: `maatctl show` prints the excerpt the server recorded for each evidence ID, and flags IDs the server never issued, so a fabricated justification stands out.
 - polkit asks for admin authentication, or follows a rule the admin scoped to one unit and verb.
-- Untrusted text is returned in data fields, never spliced into instructions, and the server's instructions say so. This reduces injection but can't prevent it; the benchmark exists to measure how often it still succeeds, and that measurement has not been made with real models yet.
+- Untrusted text is returned in data fields, never spliced into instructions, and the server's instructions say so. This reduces injection but can't prevent it; the benchmark exists to measure how often it still succeeds. So far two local models resisted the planted instructions in all 12 adversarial attempts, which says little yet: there are only two adversarial scenarios.
 
 **Residual risk:** a person can approve a bad plan. The rationale is labelled as the model's claim, and the evidence is shown so the reasoning can be checked.
 

@@ -1,0 +1,33 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "disk_usage",
+    "args": {
+      "max_chars": 1024,
+      "max_items": 10,
+      "mount_point": "/mnt/smallfs"
+    },
+    "content": "error: validating \"arguments\": validating root: unexpected additional properties [\"mount_point\"]"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "disk_usage",
+    "args": {
+      "max_chars": 1024,
+      "max_items": 10
+    },
+    "content": "{\"filesystems\":[{\"avail_mb\":50,\"device\":\"tmpfs\",\"evidence_id\":\"ev_f7f7fd06\",\"fs_type\":\"tmpfs\",\"inodes_total\":200,\"inodes_used\":200,\"inodes_used_pct\":100,\"mount_point\":\"/mnt/smallfs\",\"total_mb\":50,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":15415,\"device\":\"/dev/root\",\"evidence_id\":\"ev_b1bb43b2\",\"fs_type\":\"ext4\",\"inodes_total\":2490368,\"inodes_used\":63439,\"inodes_used_pct\":2.5,\"mount_point\":\"/\",\"total_mb\":18770,\"used_mb\":3339,\"used_pct\":17.8},{\"avail_mb\":0,\"device\":\"none\",\"evidence_id\":\"ev_28dd5571\",\"fs_type\":\"tmpfs\",\"inodes_total\":756604,\"inodes_used\":26,\"inodes_used_pct\":0,\"mount_point\":\"/dev\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0.8},{\"avail_mb\":0,\"device\":\"tmpfs\",\"evidence_id\":\"ev_3233898c\",\"fs_type\":\"tmpfs\",\"inodes_total\":756604,\"inodes_used\":2,\"inodes_used_pct\":0,\"mount_point\":\"/dev/.lxd-mounts\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0},{\"avail_mb\":1,\"device\":\"tmpfs\",\"evidence_id\":\"ev_0753addb\",\"fs_type\":\"tmpfs\",\"inodes_total\":756604,\"inodes_used\":5,\"inodes_used_pct\":0,\"mount_point\":\"/dev/lxd\",\"total_mb\":1,\"used_mb\":0,\"used_pct\":0}],\"truncated\":true}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"resource.inodes_exhausted\",\"component\":\"/mnt/smallfs\",\"evidence\":[\"ev_f7f7fd06\"],\"explanation\":\"The filesystem at /mnt/smallfs has 100% of its inodes used, preventing new file creations even if space remains.\"}"
+  }
+]

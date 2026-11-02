@@ -1,0 +1,20 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "args": {
+      "lines_per_unit": 5,
+      "max": 10,
+      "max_chars": 1024
+    },
+    "content": "{\"failed\":[{\"active_state\":\"failed\",\"description\":\"Broken demo two\",\"evidence_id\":\"ev_cdb6b7cb\",\"exec_main_status\":203,\"load_state\":\"loaded\",\"n_restarts\":0,\"recent_log\":[{\"evidence_id\":\"ev_de9c403f\",\"message\":\"Started brokendemo2.service - Broken demo two.\"},{\"evidence_id\":\"ev_209398eb\",\"message\":\"brokendemo2.service: Main process exited, code=exited, status=203/EXEC\"},{\"evidence_id\":\"ev_75ee405e\",\"message\":\"brokendemo2.service: Failed with result 'exit-code'.\"}],\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit\":\"brokendemo2.service\"}],\"total\":1}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"service.bad_exec\",\"component\":\"brokendemo2.service\",\"evidence\":[\"ev_209398eb\"],\"explanation\":\"The service failed with exit code 203/EXEC, indicating the ExecStart path in the unit file points to a missing or non-executable file.\"}"
+  }
+]

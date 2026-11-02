@@ -1,0 +1,45 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "args": {
+      "lines_per_unit": 5,
+      "max": 10,
+      "max_chars": 2000
+    },
+    "content": "{\"failed\":[{\"active_state\":\"failed\",\"description\":\"Web frontend\",\"evidence_id\":\"ev_0ec82395\",\"exec_main_status\":1,\"load_state\":\"loaded\",\"n_restarts\":0,\"recent_log\":[{\"evidence_id\":\"ev_21186a64\",\"message\":\"  File \\\"/usr/lib/python3.12/socketserver.py\\\", line 473, in server_bind\"},{\"evidence_id\":\"ev_704f7ed7\",\"message\":\"    self.socket.bind(self.server_address)\"},{\"evidence_id\":\"ev_c9123468\",\"message\":\"OSError: [Errno 98] Address already in use\"},{\"evidence_id\":\"ev_99611dd7\",\"message\":\"web.service: Main process exited, code=exited, status=1/FAILURE\"},{\"evidence_id\":\"ev_dfbdba22\",\"message\":\"web.service: Failed with result 'exit-code'.\"}],\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit\":\"web.service\"}],\"total\":1}"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "unit_status",
+    "args": {
+      "unit": "web.service"
+    },
+    "content": "{\"active_state\":\"failed\",\"description\":\"Web frontend\",\"evidence_id\":\"ev_0ec82395\",\"exec_main_status\":1,\"load_state\":\"loaded\",\"n_restarts\":0,\"name\":\"web.service\",\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit_file_state\":\"static\"}"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "listening_sockets",
+    "args": {
+      "max_chars": 2000,
+      "max_items": 50
+    },
+    "content": "{\"sockets\":[{\"evidence_id\":\"ev_0c936b92\",\"local_addr\":\"0.0.0.0\",\"local_port\":22,\"proto\":\"tcp\",\"state\":\"LISTEN\"},{\"evidence_id\":\"ev_06375c69\",\"local_addr\":\"127.0.0.53\",\"local_port\":53,\"proto\":\"tcp\",\"state\":\"LISTEN\"},{\"evidence_id\":\"ev_b8299325\",\"local_addr\":\"127.0.0.54\",\"local_port\":53,\"proto\":\"tcp\",\"state\":\"LISTEN\"},{\"evidence_id\":\"ev_8bf8307d\",\"local_addr\":\"127.0.0.1\",\"local_port\":8080,\"proto\":\"tcp\",\"state\":\"LISTEN\"},{\"evidence_id\":\"ev_ac68908f\",\"local_addr\":\"0000:0000:0000:0000:0000:0000:0000:0000\",\"local_port\":22,\"proto\":\"tcp6\",\"state\":\"LISTEN\"},{\"evidence_id\":\"ev_f604635f\",\"local_addr\":\"127.0.0.54\",\"local_port\":53,\"proto\":\"udp\",\"state\":\"BOUND\"},{\"evidence_id\":\"ev_0bfcdb86\",\"local_addr\":\"127.0.0.53\",\"local_port\":53,\"proto\":\"udp\",\"state\":\"BOUND\"},{\"evidence_id\":\"ev_dd4a18fc\",\"local_addr\":\"10.201.0.211\",\"local_port\":68,\"proto\":\"udp\",\"state\":\"BOUND\"}]}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"network.port_conflict\",\"component\":\"web.service\",\"evidence\":[\"ev_21186a64\",\"ev_704f7ed7\",\"ev_c9123468\",\"ev_99611dd7\",\"ev_dfbdba22\",\"ev_8bf8307d\"],\"explanation\":\"web.service fails to bind to port 8080 because another process is already listening on that port.\"}"
+  }
+]

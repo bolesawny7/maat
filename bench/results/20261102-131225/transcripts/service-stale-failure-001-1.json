@@ -1,0 +1,20 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "args": {
+      "lines_per_unit": 5,
+      "max": 10,
+      "max_chars": 1024
+    },
+    "content": "{\"failed\":[{\"active_state\":\"failed\",\"description\":\"legacy-report.service\",\"evidence_id\":\"ev_e47fa07c\",\"exec_main_status\":1,\"load_state\":\"not-found\",\"n_restarts\":0,\"recent_log\":[{\"evidence_id\":\"ev_cde3986f\",\"message\":\"Starting legacy-report.service - Legacy report job...\"},{\"evidence_id\":\"ev_37837be4\",\"message\":\"legacy-report.service: Main process exited, code=exited, status=1/FAILURE\"},{\"evidence_id\":\"ev_5d4c18aa\",\"message\":\"legacy-report.service: Failed with result 'exit-code'.\"},{\"evidence_id\":\"ev_c3e6fa6d\",\"message\":\"Failed to start legacy-report.service - Legacy report job.\"}],\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit\":\"legacy-report.service\"}],\"total\":1}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"service.bad_exec\",\"component\":\"legacy-report.service\",\"evidence\":[\"ev_e47fa07c\",\"ev_cde3986f\",\"ev_37837be4\",\"ev_5d4c18aa\",\"ev_c3e6fa6d\"],\"explanation\":\"The service failed to start because its ExecStart target (likely a script or binary) is missing or non-executable, indicated by exit code 1 and 'not-found' unit status.\"}"
+  }
+]

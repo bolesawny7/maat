@@ -11,7 +11,7 @@ maat is a confined, auditable MCP server and toolkit for diagnosing and repairin
 3. [docs/security-model.md](docs/security-model.md)
 4. [docs/references.md](docs/references.md)
 
-**Current status: developer preview.** The server, CLIs, actuator, trail and benchmark harness are implemented and tested; the strict snap and the full review loop were verified on a VM (see [docs/evidence/](docs/evidence/)). No real model has been benchmarked yet. A few items remain research-only (for example `netplan.try`) or manual (`snap.revert` rollback); never describe those as done.
+**Current status: developer preview.** The server, CLIs, actuator, trail and benchmark harness are implemented and tested; the strict snap and the full review loop were verified on a VM (see [docs/evidence/](docs/evidence/)). Two local models (`gpt-oss:20b` and `qwen3:8b`, through Ollama) have been benchmarked on the ten current scenarios; inference snaps and hosted models haven't. A few items remain research-only (for example `netplan.try`) or manual (`snap.revert` rollback); never describe those as done.
 
 ## Rules
 

@@ -1,0 +1,39 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "list_units",
+    "args": {
+      "max": 20,
+      "max_chars": 2000,
+      "only_failed": true
+    },
+    "content": "{\"total\":1,\"truncated\":false,\"units\":[{\"active_state\":\"failed\",\"description\":\"legacy-report.service\",\"evidence_id\":\"ev_e47fa07c\",\"load_state\":\"not-found\",\"name\":\"legacy-report.service\",\"sub_state\":\"failed\"}]}"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "propose_action",
+    "args": {
+      "evidence": [
+        "ev_e47fa07c"
+      ],
+      "kind": "service.reset-failed",
+      "params": {
+        "unit": "legacy-report.service"
+      },
+      "rationale": "The unit file for legacy-report.service is missing (load_state not-found) but the unit remains in a failed state. Resetting the failed state will clear the error flag."
+    },
+    "content": "{\"danger_level\":\"low\",\"kind\":\"service.reset-failed\",\"note\":\"No change has been made. A human must run `maatctl show 01a19c62-1161-74b7-b050-f292f8370b42` and `maatctl apply 01a19c62-1161-74b7-b050-f292f8370b42` to execute this, authorizing it through polkit.\",\"plan_id\":\"01a19c62-1161-74b7-b050-f292f8370b42\",\"preview\":\"Action: service.reset-failed\\nSummary: Clear the failed state of a systemd unit whose cause is already resolved\\nParameters: map[unit:legacy-report.service]\\nPreconditions: 1 check(s)\\nVerification: 1 check(s)\\nRollback: none (Resetting failed state only clears a flag; there is nothing to undo.)\"}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"service.stale_failure\",\"component\":\"legacy-report.service\",\"evidence\":[\"ev_e47fa07c\"],\"explanation\":\"The unit file for legacy-report.service is missing (load_state not-found) yet the unit remains marked failed. Resetting the failed state clears the stale failure flag.\"}"
+  }
+]

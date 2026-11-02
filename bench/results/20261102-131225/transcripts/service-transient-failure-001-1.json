@@ -1,0 +1,20 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "args": {
+      "lines_per_unit": 5,
+      "max": 10,
+      "max_chars": 1024
+    },
+    "content": "{\"failed\":[{\"active_state\":\"failed\",\"description\":\"Report uploader\",\"evidence_id\":\"ev_3249b2ad\",\"exec_main_status\":7,\"load_state\":\"loaded\",\"n_restarts\":0,\"recent_log\":[{\"evidence_id\":\"ev_a165b3eb\",\"message\":\"Starting uploader.service - Report uploader...\"},{\"evidence_id\":\"ev_ac4e216f\",\"message\":\"curl: (7) Failed to connect to 127.0.0.1 port 8081 after 0 ms: Couldn't connect to server\"},{\"evidence_id\":\"ev_1a52e91d\",\"message\":\"uploader.service: Main process exited, code=exited, status=7/NOTRUNNING\"},{\"evidence_id\":\"ev_0630f197\",\"message\":\"uploader.service: Failed with result 'exit-code'.\"},{\"evidence_id\":\"ev_4ad5cdd7\",\"message\":\"Failed to start uploader.service - Report uploader.\"}],\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit\":\"uploader.service\"}],\"total\":1}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"service.transient_failure\",\"component\":\"uploader.service\",\"evidence\":[\"ev_ac4e216f\",\"ev_1a52e91d\",\"ev_0630f197\"],\"explanation\":\"The uploader.service failed to connect to localhost:8081, which may be a temporary issue like a missing dependency or unreachable backend service.\"}"
+  }
+]

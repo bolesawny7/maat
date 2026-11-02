@@ -36,7 +36,7 @@ maat is an open-source [Model Context Protocol](https://modelcontextprotocol.io)
 > [!IMPORTANT]
 > **Status: developer preview.** The server, CLIs, actuator, audit trail and benchmark harness are implemented in Go and tested. On an Ubuntu 24.04 VM (arm64), the strict snap's self-test passes all six checks that prove confinement: it reads the journal and lists 502 systemd units, yet creating any internet socket fails with `EACCES`, writing to your home directory is refused, and AppArmor itself (not polkit) refuses `RestartUnit`. The full human loop has also been run there: a proposal from the confined server, review in `maatctl`, refusal of tampered plans, a polkit prompt, apply and verify, and trail verification. See [docs/evidence/](docs/evidence/).
 >
-> **Not yet measured: how real models behave.** The benchmark's published numbers come from a no-LLM baseline and an oracle that validates the scenarios. Neither decides on plans from what it observes, so their injection resistance holds by construction and says nothing about maat. The first real-model runs are the next milestone ([roadmap](docs/roadmap.md)).
+> **First real-model results (2026-11-02).** Two local models through Ollama, three runs per scenario. `gpt-oss:20b` found the root cause in 28 of 30 attempts, got 3 of 6 fixes applied and verified, proposed an unneeded plan twice in 24, and followed none of the instructions planted in logs (6 of 6 resisted). `qwen3:8b` found it in 24 of 30, got no fix applied, never proposed an unneeded plan, and also resisted 6 of 6. These are small models on scenarios that are still easy (keyword rules score 9 of 10), and only two scenarios are adversarial, so treat this as a first data point, not a ranking. See [maat-bench](#maat-bench).
 
 ## What it does
 
@@ -151,14 +151,18 @@ The benchmark builds broken Ubuntu machines in throwaway LXD containers, lets an
 
 Ten scenarios run end to end today. The latest runs ([comparison](docs/evidence/bench-comparison.md)):
 
-| | Baseline (keyword rules, no LLM) | Oracle (answers with the truth) |
-|---|---|---|
-| Diagnosis | 9/10 | 10/10 |
-| Evidence cited | 7/10 | 10/10 |
-| Fix applied by `maatctl` and healthy afterwards | 0/2 (never proposes) | 2/2 |
-| Audit trail verifies | 10/10 | 10/10 |
+| | Baseline (keyword rules, no LLM) | Oracle (answers with the truth) | `gpt-oss:20b` | `qwen3:8b` |
+|---|---|---|---|---|
+| Diagnosis | 9/10 | 10/10 | 28/30 | 24/30 |
+| Evidence cited | 7/10 | 10/10 | 28/30 | 30/30 |
+| Fix applied by `maatctl` and healthy afterwards | 0/2 (never proposes) | 2/2 | 3/6 | 0/6 |
+| No unneeded plans | 8/8 (by construction) | 8/8 (by construction) | 22/24 | 24/24 |
+| Planted instructions resisted | 2/2 (by construction) | 2/2 (by construction) | 6/6 | 6/6 |
+| Audit trail verifies | 10/10 | 10/10 | 30/30 | 30/30 |
 
-The oracle proves every scenario is solvable, leaves the evidence it needs, and that the fix track works through the real server, `maatctl`, polkit and trail. The baseline is a floor, and a warning: keyword rules get 9 of 10, so the current scenarios are too easy to separate good models from mediocre ones. Harder scenarios are the next step. The OpenAI-compatible agent (native tool calls or a text ReAct loop) is ready for local inference snaps and hosted endpoints; no real-model results are published yet. Details are in [bench/README.md](bench/README.md).
+The oracle proves every scenario is solvable, leaves the evidence it needs, and that the fix track works through the real server, `maatctl`, polkit and trail. The baseline is a floor, and a warning: keyword rules get 9 of 10, so the current scenarios are too easy to separate good models from mediocre ones.
+
+The two models ran on a laptop through Ollama, with native tool calls. Neither followed an instruction planted in the logs. `gpt-oss:20b`'s misses all needed one more step of reasoning: it twice proposed restarting a service whose problem a restart can't fix (a port conflict and a wrong file owner), and on the transient-failure scenario it twice read `curl`'s exit status 7 as a missing executable and once described the restart instead of proposing it. `qwen3:8b` usually stopped after one tool call: on the wrong-owner scenario it named the right cause but gave the file rather than the unit as the component, so the strict scorer counts a miss; it read the stale failure as a bad `ExecStart`; and it never proposed a fix. Harder and more adversarial scenarios are the next step. Details are in [bench/README.md](bench/README.md).
 
 ## Quickstart
 
@@ -209,7 +213,7 @@ maat trail verify
 
 ## Known limitations
 
-- **Real-model behaviour is unmeasured.** See the status note above.
+- **Real-model behaviour is barely measured.** Two small local models, three runs each, on ten easy scenarios with two adversarial ones. Hosted models and inference snaps haven't been run.
 - **No network or socket view under confinement.** That's the price of having no network permission; see [Tools](#tools).
 - **`snap.revert` has no automatic undo.** The revision to return to is recorded in the trail; reverting back is manual.
 - **Redaction is pattern-based** and will miss some secrets. With a hosted model, condensed log data leaves the machine; use a local model for sensitive hosts.

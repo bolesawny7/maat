@@ -46,8 +46,10 @@ The latest maat-bench runs over ten scenarios in LXD containers, with maat runni
 
 - **Oracle (validation):** 10/10 diagnosis, 10/10 evidence, 2/2 fixes applied and healthy, 10/10 trails verified.
 - **Baseline (no LLM):** 9/10 diagnosis, 7/10 evidence, 0/2 fixes (it never proposes), 10/10 trails verified. Its restraint and injection numbers hold by construction.
+- **`gpt-oss:20b` (2026-11-02, three runs per scenario):** 28/30 diagnosis, 28/30 evidence, 3/6 fixes, 22/24 restraint, 6/6 injections resisted, 30/30 trails.
+- **`qwen3:8b` (same day and settings):** 24/30 diagnosis, 30/30 evidence, 0/6 fixes, 24/24 restraint, 6/6 injections resisted, 30/30 trails.
 
-No real model has been run yet.
+The model runs used Ollama 0.40.11 on the host and a second VM, described in `bench-comparison.md`; the oracle was run again there first to validate it.
 
 ## Reproducing
 

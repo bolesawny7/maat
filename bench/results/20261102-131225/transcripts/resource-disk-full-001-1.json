@@ -1,0 +1,48 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "disk_usage",
+    "args": {
+      "max_chars": 1000,
+      "max_items": 10
+    },
+    "content": "{\"filesystems\":[{\"avail_mb\":0,\"device\":\"tmpfs\",\"evidence_id\":\"ev_1059ffea\",\"fs_type\":\"tmpfs\",\"inodes_total\":756604,\"inodes_used\":2,\"inodes_used_pct\":0,\"mount_point\":\"/mnt/appdata\",\"total_mb\":8,\"used_mb\":8,\"used_pct\":100},{\"avail_mb\":15415,\"device\":\"/dev/root\",\"evidence_id\":\"ev_b1bb43b2\",\"fs_type\":\"ext4\",\"inodes_total\":2490368,\"inodes_used\":63447,\"inodes_used_pct\":2.5,\"mount_point\":\"/\",\"total_mb\":18770,\"used_mb\":3339,\"used_pct\":17.8},{\"avail_mb\":0,\"device\":\"none\",\"evidence_id\":\"ev_28dd5571\",\"fs_type\":\"tmpfs\",\"inodes_total\":756604,\"inodes_used\":26,\"inodes_used_pct\":0,\"mount_point\":\"/dev\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0.8},{\"avail_mb\":0,\"device\":\"tmpfs\",\"evidence_id\":\"ev_3233898c\",\"fs_type\":\"tmpfs\",\"inodes_total\":756604,\"inodes_used\":2,\"inodes_used_pct\":0,\"mount_point\":\"/dev/.lxd-mounts\",\"total_mb\":0,\"used_mb\":0,\"used_pct\":0}],\"truncated\":true}"
+  },
+  {
+    "role": "tool",
+    "tool": "journal_summary",
+    "args": {
+      "max_chars": 1000,
+      "max_items": 10,
+      "since_seconds": 3600,
+      "unit": "appdata.service"
+    },
+    "content": "{\"redactions\":0,\"shown\":0,\"templates\":null,\"total_records\":0,\"total_templates\":0,\"truncated\":false,\"window\":{\"from\":\"0001-01-01T00:00:00Z\",\"to\":\"0001-01-01T00:00:00Z\"}}"
+  },
+  {
+    "role": "tool",
+    "tool": "unit_status",
+    "args": {
+      "unit": "appdata.service"
+    },
+    "content": "error: unit not loaded: appdata.service"
+  },
+  {
+    "role": "tool",
+    "tool": "apparmor_denials",
+    "args": {
+      "max": 10,
+      "max_chars": 1000,
+      "since_seconds": 3600
+    },
+    "content": "{\"denials\":[],\"total\":0}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"resource.disk_full\",\"component\":\"/mnt/appdata\",\"evidence\":[\"ev_1059ffea\"],\"explanation\":\"The filesystem mounted at /mnt/appdata is out of space (0 MB available), preventing write operations.\"}"
+  }
+]
