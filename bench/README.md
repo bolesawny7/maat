@@ -6,11 +6,15 @@ A sibling benchmark, [maat-bench/agents](agents/README.md), asks the last questi
 
 A sibling benchmark, [maat-bench/agents](agents/README.md), asks the last question of other tools: it plants an instruction in a broken Kubernetes namespace and measures whether HolmesGPT, k8sgpt and OpenCode follow it.
 
-**Status: the harness works; real models haven't been measured yet.** The harness, the deterministic scorer, the LXD driver, the MCP-over-`lxc exec` bridge, three agents (a no-LLM baseline, an OpenAI-compatible LLM agent, and an oracle for validation) and ten scenarios run end to end on an Ubuntu 24.04 VM. The latest runs are in [results/](results/) and summarized in [../docs/evidence/bench-comparison.md](../docs/evidence/bench-comparison.md):
+**Status: the harness works, and two local models have been measured.** The harness, the deterministic scorer, the LXD driver, the MCP-over-`lxc exec` bridge, three agents (a no-LLM baseline, an OpenAI-compatible LLM agent, and an oracle for validation) and ten scenarios run end to end on an Ubuntu 24.04 VM. The latest runs are in [results/](results/) and summarized in [../docs/evidence/bench-comparison.md](../docs/evidence/bench-comparison.md):
 
 - **Oracle (validation):** 10/10 diagnosis, 10/10 evidence, and both fix scenarios recover after the real `maatctl` applies the proposed plan. This proves the scenarios are solvable, leave the evidence their truth requires, and that the server, `maatctl`, polkit, health checks and audit trail work together.
 - **Baseline (keyword rules, no LLM):** 9/10 diagnosis, 7/10 evidence, 0/2 fixes. It never proposes a plan, so its 8/8 restraint and 2/2 injection resistance hold by construction and measure nothing; the reports say so. Its real lesson is that keyword rules nearly ace the current set, so harder scenarios come before any leaderboard.
-- **OpenAI-compatible agent:** native function-calling (`tools`) or a text ReAct loop (`react`, the default, for endpoints without function-calling). It was tried against SmolLM2 135M during development, a model too small to drive the tools; no results from that run are kept, and no capable model has been run yet.
+- **OpenAI-compatible agent:** native function-calling (`tools`) or a text ReAct loop (`react`, the default, for endpoints without function-calling). On 2026-11-02, `gpt-oss:20b` and `qwen3:8b` ran through Ollama 0.40.11 with `-protocol tools -max-reply-tokens 8192 -timeout 900 -runs 3`:
+  - `gpt-oss:20b`: 28/30 diagnosis, 28/30 evidence, 3/6 fixes, 22/24 restraint, 6/6 injections resisted, 30/30 trails.
+  - `qwen3:8b`: 24/30 diagnosis, 30/30 evidence, 0/6 fixes, 24/24 restraint, 6/6 injections resisted, 30/30 trails.
+
+  Every failure was read in its transcript. The misses are real model mistakes, with one caveat: on `permissions-wrong-owner-001`, `qwen3:8b` named the right cause all three times but gave the file as the component instead of the unit. A first run of the same models found a harness bug: replies with no text dropped the `content` field, which Ollama rejects. It's fixed (with a test), and only runs made with the fixed harness are published.
 
 Facts (F) and assumptions (A) are defined in [references.md](../docs/references.md).
 

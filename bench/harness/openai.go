@@ -61,9 +61,11 @@ func (a *OpenAIAgent) Investigate(ctx context.Context, box *Box, s *Scenario) (A
 }
 
 // OpenAI chat wire types (minimal subset).
+// Content is always sent, even when empty: Ollama rejects an assistant message
+// without it, which is what a reply cut off by max_tokens looks like.
 type oaMessage struct {
 	Role       string       `json:"role"`
-	Content    string       `json:"content,omitempty"`
+	Content    string       `json:"content"`
 	ToolCalls  []oaToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string       `json:"tool_call_id,omitempty"`
 	Name       string       `json:"name,omitempty"`

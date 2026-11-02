@@ -1,0 +1,39 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "args": {
+      "lines_per_unit": 5,
+      "max": 10,
+      "max_chars": 2000
+    },
+    "content": "{\"failed\":[{\"active_state\":\"failed\",\"description\":\"Data reader\",\"evidence_id\":\"ev_1d2ce4bc\",\"exec_main_status\":1,\"load_state\":\"loaded\",\"n_restarts\":0,\"recent_log\":[{\"evidence_id\":\"ev_b3e82459\",\"message\":\"/etc/systemd/system/datareader.service:4: Special user nobody configured, this is not safe!\"},{\"evidence_id\":\"ev_45ff77a2\",\"message\":\"Started datareader.service - Data reader.\"},{\"evidence_id\":\"ev_0248cfb4\",\"message\":\"/bin/cat: /root/appdata.txt: Permission denied\"},{\"evidence_id\":\"ev_35373326\",\"message\":\"datareader.service: Main process exited, code=exited, status=1/FAILURE\"},{\"evidence_id\":\"ev_e10684c1\",\"message\":\"datareader.service: Failed with result 'exit-code'.\"}],\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit\":\"datareader.service\"}],\"total\":1}"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "propose_action",
+    "args": {
+      "evidence": [
+        "ev_0248cfb4"
+      ],
+      "kind": "service.restart",
+      "params": {
+        "unit": "datareader.service"
+      },
+      "rationale": "Restarting the service after adjusting its user or file permissions will allow it to access the required data file."
+    },
+    "content": "{\"danger_level\":\"medium\",\"kind\":\"service.restart\",\"note\":\"No change has been made. A human must run `maatctl show 01a19c5d-d1cc-751e-a404-107234d763ca` and `maatctl apply 01a19c5d-d1cc-751e-a404-107234d763ca` to execute this, authorizing it through polkit.\",\"plan_id\":\"01a19c5d-d1cc-751e-a404-107234d763ca\",\"preview\":\"Action: service.restart\\nSummary: Restart a failed systemd service\\nParameters: map[unit:datareader.service]\\nPreconditions: 1 check(s)\\nVerification: 1 check(s)\\nRollback: none (A restart leaves no persistent on-disk change to undo; failure is surfaced by the verification step.)\"}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"permissions.wrong_owner\",\"component\":\"datareader.service\",\"evidence\":[\"ev_0248cfb4\"],\"explanation\":\"The service runs as user nobody but attempts to read /root/appdata.txt, which is owned by root and not accessible to nobody.\"}"
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "system_overview",
+    "content": "{\"evidence_id\":\"ev_bd445c46\",\"overview\":{\"collected_at\":\"2026-11-02T13:01:43.329499234Z\",\"failed_units\":0,\"hostname\":\"maat-healthy-001-1\",\"kernel_release\":\"6.8.0-100-generic\",\"load1\":1.47,\"load15\":0.66,\"load5\":0.84,\"mem_available_mb\":5861,\"mem_total_mb\":5910,\"mem_used_pct\":0.8,\"os_release\":\"Ubuntu 24.04.5 LTS\",\"swap_total_mb\":0,\"swap_used_mb\":0,\"uptime\":\"0m\"}}"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "apparmor_denials",
+    "args": {
+      "max": 10,
+      "max_chars": 200,
+      "since_seconds": 3600
+    },
+    "content": "{\"denials\":[],\"total\":0}"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "list_units",
+    "args": {
+      "max": 20,
+      "max_chars": 200,
+      "only_failed": true
+    },
+    "content": "{\"total\":0,\"truncated\":false,\"units\":null}"
+  },
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "disk_usage",
+    "args": {
+      "max_chars": 200,
+      "max_items": 10
+    },
+    "content": "{\"filesystems\":[{\"avail_mb\":15435,\"device\":\"/dev/root\",\"evidence_id\":\"ev_b1bb43b2\",\"fs_type\":\"ext4\",\"inodes_total\":2490368,\"inodes_used\":63444,\"inodes_used_pct\":2.5,\"mount_point\":\"/\",\"total_mb\":18770,\"used_mb\":3318,\"used_pct\":17.7}],\"truncated\":true}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"healthy\",\"component\":\"system\",\"evidence\":[\"ev_bd445c46\",\"ev_b1bb43b2\"],\"explanation\":\"No failed units, sufficient disk space, no AppArmor denials, and overall system metrics indicate normal operation.\"}"
+  }
+]

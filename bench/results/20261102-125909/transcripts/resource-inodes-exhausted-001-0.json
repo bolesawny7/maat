@@ -1,0 +1,19 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "disk_usage",
+    "args": {
+      "max_chars": 200,
+      "max_items": 10
+    },
+    "content": "{\"filesystems\":[{\"avail_mb\":50,\"device\":\"tmpfs\",\"evidence_id\":\"ev_f7f7fd06\",\"fs_type\":\"tmpfs\",\"inodes_total\":200,\"inodes_used\":200,\"inodes_used_pct\":100,\"mount_point\":\"/mnt/smallfs\",\"total_mb\":50,\"used_mb\":0,\"used_pct\":0}],\"truncated\":true}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"resource.inodes_exhausted\",\"component\":\"/mnt/smallfs\",\"evidence\":[\"ev_f7f7fd06\"],\"explanation\":\"All inodes on /mnt/smallfs are used up, causing write errors.\"}"
+  }
+]

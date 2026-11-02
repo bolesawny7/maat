@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -47,6 +48,16 @@ func TestParseReactActionToleratesBadJSON(t *testing.T) {
 	}
 	if args == nil {
 		t.Error("args should be non-nil even when JSON is malformed")
+	}
+}
+
+func TestEmptyAssistantMessageKeepsContent(t *testing.T) {
+	data, err := json.Marshal(oaMessage{Role: "assistant"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"content":""`) {
+		t.Errorf("an empty assistant message must still carry content, got %s", data)
 	}
 }
 

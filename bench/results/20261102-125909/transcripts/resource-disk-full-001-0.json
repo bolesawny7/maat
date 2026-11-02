@@ -1,0 +1,19 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "disk_usage",
+    "args": {
+      "max_chars": 200,
+      "max_items": 5
+    },
+    "content": "{\"filesystems\":[{\"avail_mb\":0,\"device\":\"tmpfs\",\"evidence_id\":\"ev_1059ffea\",\"fs_type\":\"tmpfs\",\"inodes_total\":756604,\"inodes_used\":2,\"inodes_used_pct\":0,\"mount_point\":\"/mnt/appdata\",\"total_mb\":8,\"used_mb\":8,\"used_pct\":100}],\"truncated\":true}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"resource.disk_full\",\"component\":\"/mnt/appdata\",\"evidence\":[\"ev_1059ffea\"],\"explanation\":\"The filesystem mounted at /mnt/appdata is 100% full, causing write errors for the application that stores its data there.\"}"
+  }
+]

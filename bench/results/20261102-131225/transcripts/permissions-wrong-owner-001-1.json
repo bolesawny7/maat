@@ -1,0 +1,20 @@
+[
+  {
+    "role": "model",
+    "content": ""
+  },
+  {
+    "role": "tool",
+    "tool": "recent_failures",
+    "args": {
+      "lines_per_unit": 5,
+      "max": 10,
+      "max_chars": 1024
+    },
+    "content": "{\"failed\":[{\"active_state\":\"failed\",\"description\":\"Data reader\",\"evidence_id\":\"ev_1d2ce4bc\",\"exec_main_status\":1,\"load_state\":\"loaded\",\"n_restarts\":0,\"recent_log\":[{\"evidence_id\":\"ev_b3e82459\",\"message\":\"/etc/systemd/system/datareader.service:4: Special user nobody configured, this is not safe!\"},{\"evidence_id\":\"ev_45ff77a2\",\"message\":\"Started datareader.service - Data reader.\"},{\"evidence_id\":\"ev_0248cfb4\",\"message\":\"/bin/cat: /root/appdata.txt: Permission denied\"},{\"evidence_id\":\"ev_35373326\",\"message\":\"datareader.service: Main process exited, code=exited, status=1/FAILURE\"},{\"evidence_id\":\"ev_e10684c1\",\"message\":\"datareader.service: Failed with result 'exit-code'.\"}],\"result\":\"exit-code\",\"sub_state\":\"failed\",\"unit\":\"datareader.service\"}],\"total\":1}"
+  },
+  {
+    "role": "model",
+    "content": "{\"root_cause\":\"permissions.wrong_owner\",\"component\":\"/root/appdata.txt\",\"evidence\":[\"ev_0248cfb4\"],\"explanation\":\"The datareader service lacks permissions to access /root/appdata.txt, causing it to fail at startup.\"}"
+  }
+]
